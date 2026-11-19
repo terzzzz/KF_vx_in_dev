@@ -1,9 +1,9 @@
 /* js/soul_agent.js
- * Exact-matchup checkpoint & 49-Matchup Matrix (data/matrix/matrix_r0_vs_r0.json .. r6_vs_r6.json) storage (v7).
+- Exact-matchup checkpoint & 64-Matchup Matrix (data/matrix/matrix_r0_vs_r0.json .. r7_vs_r7.json) storage (v7).
  *
- * Build: v5-state256-action17
- * Matrix: v7-7riders-10backup (IndexedDB + data/matrix/ 49-Matrix Persistence)
- * Patch: charge1-reset1
+- Build: v5-state256-action17
+- Matrix: v7-8riders-9backup (IndexedDB + data/matrix/ 64-Matrix Persistence)
+- Patch: charge1-reset1
  */
 
 // Lift 5MB localStorage barrier into Unlimited Temp RAM
@@ -65,8 +65,8 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   const IDB_VERSION = 1;
   const IDB_STORE = "matrix_store";
 
-  const ACTIVE_ROSTER_COUNT = 7;
-  const BACKUP_SLOT_COUNT = 10;
+  const ACTIVE_ROSTER_COUNT = 8;
+  const BACKUP_SLOT_COUNT = 9;
   const RESERVED_PARAM_SLOTS = 10;
   const TOTAL_MATRIX_SLOTS = ACTIVE_ROSTER_COUNT + BACKUP_SLOT_COUNT;
 
@@ -177,14 +177,18 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       }
     }
 
-    if (/^r([0-6])$/.test(value)) {
+    if (/^r(\d+)$/.test(value)) {
       const idx = Number(value.slice(1)) + 1;
-      return formatCodeNumber(idx);
+      if (idx >= 1 && idx <= TOTAL_MATRIX_SLOTS) {
+        return formatCodeNumber(idx);
+      }
     }
 
-    if (/^[0-6]$/.test(value)) {
+    if (/^(\d+)$/.test(value)) {
       const idx = Number(value) + 1;
-      return formatCodeNumber(idx);
+      if (idx >= 1 && idx <= TOTAL_MATRIX_SLOTS) {
+        return formatCodeNumber(idx);
+      }
     }
 
     throw new Error("Unknown rider ID/code: " + id);
@@ -196,15 +200,20 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   }
 
   /**
-   * Converts any rider identifier ("ichigo", "001", "r0", 0) to 0..6 index
-   * where r0 = Ichigo (0) .. r6 = Stronger (6).
+- Converts any rider identifier ("ichigo", "001", "r0", 0) to 0..16 index
+- where r0 = Ichigo (0) .. r6 = Stronger (6), r7 = Skyrider (7).
    */
   function toRiderIndex(id) {
-    if (typeof id === "number" && Number.isInteger(id) && id >= 0 && id <= 6) {
+    if (
+      typeof id === "number" &&
+      Number.isInteger(id) &&
+      id >= 0 &&
+      id < TOTAL_MATRIX_SLOTS
+    ) {
       return id;
     }
     const code = toCode(id);
-    return Math.max(0, Math.min(6, Number(code) - 1));
+    return Math.max(0, Math.min(TOTAL_MATRIX_SLOTS - 1, Number(code) - 1));
   }
 
   function getMatrixFileName(learner, opponent) {
@@ -587,7 +596,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
         populatedMatchups,
         neuralParamsPerMatchup: 42257,
         totalNeuralParamsInBundle: populatedMatchups * 42257,
-        max7RiderBundleParams: ACTIVE_ROSTER_COUNT * 42257,
+        maxActiveBundleParams: activeCodes.length * 42257,
         max17SlotBundleParams: TOTAL_MATRIX_SLOTS * 42257,
         reservedSummarySlots: new Array(RESERVED_PARAM_SLOTS).fill(0)
       }
@@ -768,7 +777,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       storage.setItem(STORAGE_KEY, JSON.stringify(payload));
       storageWarning = "";
     } catch (_) {
-      // IndexedDB + RAM hold all 49 matrices even when 5MB localStorage is full
+      // IndexedDB + RAM hold all 64 matrices even when 5MB localStorage is full
       storageWarning = "";
     }
   }
@@ -829,11 +838,11 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   }
 
   /**
-   * Builds candidate URLs for a 1v1 matchup:
-   * 1. `data/matrix/matrix_r{A}_vs_r{B}.json` (Primary location in `data/matrix/`)
-   * 2. `data/matrix/matrix_r{A}_r{B}.json`
-   * 3. `data/matrix_r{A}_vs_r{B}.json`
-   * 4. `data/matrix_r{A}_r{B}.json`
+- Builds candidate URLs for a 1v1 matchup:
+- 1. `data/matrix/matrix_r{A}_vs_r{B}.json` (Primary location in `data/matrix/`)
+- 2. `data/matrix/matrix_r{A}_r{B}.json`
+- 3. `data/matrix_r{A}_vs_r{B}.json`
+- 4. `data/matrix_r{A}_r{B}.json`
    */
   function matchupMatrixURLs(learner, opponent) {
     const rA = toRiderIndex(learner);
@@ -1089,9 +1098,9 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   }
 
   /**
-   * Fetches the exact 1v1 matchup file from `data/matrix/matrix_r{learner}_vs_r{opponent}.json`
-   * (with fallbacks to `data/matrix_r{learner}_vs_r{opponent}.json`)
-   * and returns the validated checkpoint object for `ai_worker.js` and `KF_AI.choose()`.
+- Fetches the exact 1v1 matchup file from `data/matrix/matrix_r{learner}_vs_r{opponent}.json`
+- (with fallbacks to `data/matrix_r{learner}_vs_r{opponent}.json`)
+- and returns the validated checkpoint object for `ai_worker.js` and `KF_AI.choose()`.
    */
   async function fetchMatchupFromCDN(learner, opponent) {
     assertRuntime();
@@ -1227,7 +1236,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
         loadFromLocalStorage();
         await loadFromIndexedDB();
 
-        // 2. Scan all 49 `data/matrix/matrix_rA_vs_rB.json` files
+        // 2. Scan all `data/matrix/matrix_rA_vs_rB.json` files
         await scanAllMatchupsFromRepo();
         await flushStorage();
 
@@ -1759,7 +1768,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
     status
   };
 
-  // Auto-preload all 49 `data/matrix/matrix_rX_vs_rY.json` files on the main thread
+  // Auto-preload all `data/matrix/matrix_rX_vs_rY.json` files on the main thread
   if (typeof document !== "undefined") {
     loadFromLocalStorage();
     setTimeout(() => {
