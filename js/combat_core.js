@@ -1,21 +1,21 @@
 /* js/combat_core.js
- * Kamen Fight — Deterministic Combat Rules & Resolution Engine
+- Kamen Fight — Deterministic Combat Rules & Resolution Engine
  *
- * Status timing:
- * - One turn is one complete call to resolve().
- * - Newly applied periodic effects do not pay on their application turn.
- * - Duration 3 means three subsequent periodic payments.
- * - Refreshing an existing effect does not postpone an already-due payment.
- * - Regeneration resolves before bleeding (if the fighter is still alive).
- * - Bleeding does not cancel cancelOnLpDamage statuses (such as Life Regen).
- * - Both fighters receive periodic effects before winner determination (a fighter can bleed to KO).
- * - Regeneration cannot revive a fighter at zero LP.
- * - Direct attack/chip LP damage removes statuses marked cancelOnLpDamage.
- * - Charging timers never apply or expire combat statuses.
- *  
- * Randomness:
- * - resolve() requires an explicit RNG.
- * - distribution() enumerates the same resolver's chance branches.
+- Status timing:
+- - One turn is one complete call to resolve().
+- - Newly applied periodic effects do not pay on their application turn.
+- - Duration 3 means three subsequent periodic payments.
+- - Refreshing an existing effect does not postpone an already-due payment.
+- - Regeneration resolves before bleeding (if the fighter is still alive).
+- - Bleeding does not cancel cancelOnLpDamage statuses (such as Life Regen).
+- - Both fighters receive periodic effects before winner determination (a fighter can bleed to KO).
+- - Regeneration cannot revive a fighter at zero LP.
+- - Direct attack/chip LP damage removes statuses marked cancelOnLpDamage.
+- - Charging timers never apply or expire combat statuses.
+-  
+- Randomness:
+- - resolve() requires an explicit RNG.
+- - distribution() enumerates the same resolver's chance branches.
  */
 (function (g) {
   "use strict";
@@ -56,11 +56,12 @@
     offensive: false,
     guardKind: null,
     requiresSpecialsEnabled: false,
+    requiresAirborne: false,
     video: "idle.mp4"
   });
 
   /*
-   * Legacy fallback status definitions (used only if moves.json omits buff.effects).
+- Legacy fallback status definitions (used only if moves.json omits buff.effects).
    */
   const EFFECTS = {
     typhoon_speed: { speed: 1.25 },
@@ -88,8 +89,8 @@
   };
 
   /**
-   * Resolves a status definition's modifiers.
-   * Reads directly from moves.json `buff.effects` first.
+- Resolves a status definition's modifiers.
+- Reads directly from moves.json `buff.effects` first.
    */
   function effectDefinition(buff, riderId) {
     if (buff.effects && typeof buff.effects === "object") {
@@ -115,8 +116,8 @@
   }
 
   /**
-   * Automatically builds the UI label suffix from numeric effect modifiers
-   * so moves.json only needs to store the numbers in `effects`.
+- Automatically builds the UI label suffix from numeric effect modifiers
+- so moves.json only needs to store the numbers in `effects`.
    */
   function formatStatusLabel(rawLabel, id, effects) {
     const baseTitle = String(rawLabel || id || "STATUS")
@@ -188,7 +189,7 @@
   }
 
   /**
-   * Normalizes raw buff/debuff data and auto-generates `label` from `effects`.
+- Normalizes raw buff/debuff data and auto-generates `label` from `effects`.
    */
   function normalizeBuff(buff, riderId) {
     if (!buff) return null;
@@ -248,8 +249,8 @@
   }
 
   /**
-   * Returns true if the fighter currently has an active status effect
-   * with `enableSpecials: true` (e.g. Stronger's Electro Dynamo).
+- Returns true if the fighter currently has an active status effect
+- with `enableSpecials: true` (e.g. Stronger's Electro Dynamo).
    */
   function hasSpecialsEnabled(player) {
     if (!player || !Array.isArray(player.activeBuffs)) {
@@ -270,9 +271,9 @@
   }
 
   /**
-   * Compiles raw rider move definitions into normalized move structures.
+- Compiles raw rider move definitions into normalized move structures.
    *
-   * Compiled move data is treated as read-only during combat.
+- Compiled move data is treated as read-only during combat.
    */
   function compileMoves(raw) {
     const output = {};
@@ -321,6 +322,8 @@
             source.requiresSpecialsEnabled ??
             (kitGatesSpecials && direction === "S")
           ),
+
+          requiresAirborne: Boolean(source.requiresAirborne),
 
           buff: normalizeBuff(source.buff, riderId),
           debuff: normalizeBuff(source.debuff, riderId)
@@ -384,7 +387,7 @@
   }
 
   /**
-   * Copies mutable fighter state.
+- Copies mutable fighter state.
    */
   function copyFighter(player) {
     return {
@@ -406,7 +409,7 @@
   }
 
   /**
-   * Copies match state while sharing read-only compiled move definitions.
+- Copies match state while sharing read-only compiled move definitions.
    */
   function copyState(state) {
     return {
@@ -418,7 +421,7 @@
   }
 
   /**
-   * Creates a fighter's initial combat state.
+- Creates a fighter's initial combat state.
    */
   function createFighter(rider) {
     return {
@@ -455,7 +458,7 @@
   }
 
   /**
-   * Creates a new match from two rider definitions and compiled moves.
+- Creates a new match from two rider definitions and compiled moves.
    */
   function createMatch(rider1, rider2, allMoves) {
     if (
@@ -482,11 +485,11 @@
   }
 
   /**
-   * Combines the fighter's active combat modifiers and start-of-turn Chi state.
+- Combines the fighter's active combat modifiers and start-of-turn Chi state.
    *
-   * Start-of-turn Chi thresholds:
-   * - chi < 5  : attack -35% (x0.65), evasion x0.75
-   * - chi > 14 : attack +35% (x1.35), evasion x1.25
+- Start-of-turn Chi thresholds:
+- - chi < 5  : attack -35% (x0.65), evasion x0.75
+- - chi > 14 : attack +35% (x1.35), evasion x1.25
    */
   function modifiers(player, startChi = player.chi) {
     const result = {
@@ -534,7 +537,7 @@
   }
 
   /**
-   * Full-charge duration after speed modifiers.
+- Full-charge duration after speed modifiers.
    */
   function chargeMs(player, direction) {
     return (
@@ -544,9 +547,9 @@
   }
 
   /**
-   * Remaining milliseconds required for `player` to reach `targetCharge`
-   * on `direction`, accounting for active speed buffs/debuffs and `elapsedMs`
-   * already spent charging that direction.
+- Remaining milliseconds required for `player` to reach `targetCharge`
+- on `direction`, accounting for active speed buffs/debuffs and `elapsedMs`
+- already spent charging that direction.
    */
   function timeToChargeMs(
     player,
@@ -612,8 +615,8 @@
   }
 
   /**
-   * Calculates charge progress (1% to 100%) for a held WSAD direction,
-   * tallying strictly with common.js calculateChargeProgress and fighter speed.
+- Calculates charge progress (1% to 100%) for a held WSAD direction,
+- tallying strictly with common.js calculateChargeProgress and fighter speed.
    */
   function chargePercent(player, direction, elapsedMs) {
     const key = String(direction || "").toUpperCase();
@@ -650,9 +653,9 @@
   }
 
   /**
-   * Creates a live or simulated direction-charge tracker.
-   * Switching from any letter of WSAD to another letter of WSAD resets
-   * elapsedMs to 0 and restarts charge at 1%.
+- Creates a live or simulated direction-charge tracker.
+- Switching from any letter of WSAD to another letter of WSAD resets
+- elapsedMs to 0 and restarts charge at 1%.
    */
   function createChargeTracker() {
     return {
@@ -710,9 +713,9 @@
   }
 
   /**
-   * Returns true if the move requires `enableSpecials` (or if the rider's kit
-   * has an `enableSpecials` buff and the move is an S-direction move) and the
-   * fighter does NOT currently have `enableSpecials` active.
+- Returns true if the move requires `enableSpecials` (or if the rider's kit
+- has an `enableSpecials` buff and the move is an S-direction move) and the
+- fighter does NOT currently have `enableSpecials` active.
    */
   function isSpecialLocked(state, slot, move) {
     if (!move || move.key === "DO_NOTHING") return false;
@@ -741,6 +744,28 @@
     return false;
   }
 
+  /**
+- Returns true if the fighter currently has active airborne ticks
+- (e.g. from Jump / High Leap / Sailing Jump).
+   */
+  function isAirborne(player) {
+    return Number(player?.airborneTicks || 0) > 0;
+  }
+
+  /**
+- Returns true if the move requires the fighter to be airborne
+- (`requiresAirborne: true`) and the fighter is currently grounded.
+   */
+  function isAirborneLocked(state, slot, move) {
+    if (!move || move.key === "DO_NOTHING") return false;
+    if (!move.requiresAirborne) return false;
+
+    const player = state?.[slot];
+    if (!player) return false;
+
+    return !isAirborne(player);
+  }
+
   function isLegal(state, slot, action) {
     if (
       !action ||
@@ -764,6 +789,10 @@
     }
 
     if (isSpecialLocked(state, slot, move)) {
+      return false;
+    }
+
+    if (isAirborneLocked(state, slot, move)) {
       return false;
     }
 
@@ -834,6 +863,8 @@
       if (move.chiCost > state[slot].chi) continue;
 
       if (isSpecialLocked(state, slot, move)) continue;
+
+      if (isAirborneLocked(state, slot, move)) continue;
 
       const dirConstraint =
         directionConstraints &&
@@ -1392,7 +1423,7 @@
       attacker.chi -= move.chiCost;
 
       /*
-       * Utility moves: buffs, airborne state, instant LP/faint/chi recovery.
+- Utility moves: buffs, airborne state, instant LP/faint/chi recovery.
        */
       if (!move.offensive) {
         applyBuff(
@@ -1443,7 +1474,7 @@
       }
 
       /*
-       * Offensive move resolution (evaluated strictly using start-of-turn Chi).
+- Offensive move resolution (evaluated strictly using start-of-turn Chi).
        */
       const atk = modifiers(attacker, startChi[slot]);
       const def = modifiers(defender, startChi[targetSlot]);
@@ -1838,8 +1869,8 @@
   }
 
   /**
-   * Calculates turn-based end-of-match score and itemized breakdown for `slot`
-   * (default "p1") across wins, losses, and draws.
+- Calculates turn-based end-of-match score and itemized breakdown for `slot`
+- (default "p1") across wins, losses, and draws.
    */
   function calculateScore(state, options = {}) {
     const slot = options.slot === "p2" ? "p2" : "p1";
@@ -1936,6 +1967,8 @@
     modifiers,
     hasSpecialsEnabled,
     isSpecialLocked,
+    isAirborne,
+    isAirborneLocked,
     chargeMs,
     timeToChargeMs,
     maxCharge,
