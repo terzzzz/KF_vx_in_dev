@@ -1,7 +1,7 @@
 /* js/rider_brains.js
- * Kamen Fight
- * Rider Tactical Brains, Heuristic Evaluator & Move Priors
- * Build: v5-state256-action17 (charge1-reset1 + stronger-dynamo compatible)
+- Kamen Fight
+- Rider Tactical Brains, Heuristic Evaluator & Move Priors
+- Build: v5-state256-action17 (charge1-reset1 + dynamo + airborne compatible)
  */
 (function (g) {
   "use strict";
@@ -53,9 +53,19 @@
     return false;
   }
 
+  function kitRequiresAirborne(movesForSlot) {
+    if (!movesForSlot) return false;
+    for (const mv of Object.values(movesForSlot)) {
+      if (mv?.requiresAirborne) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /*
-   * Summarizes active buffs/debuffs on a fighter across all status formats
-   * used by CombatCore (including activeBuffs[].effects).
+- Summarizes active buffs/debuffs on a fighter across all status formats
+- used by CombatCore (including activeBuffs[].effects).
    */
   function summarizeStatuses(fighter) {
     const summary = {
@@ -71,12 +81,16 @@
       hasSpeedBuff: false,
       hasRegenBuff: false,
       hasSpecialsEnabled: false,
-      specialsRoundsLeft: 0
+      specialsRoundsLeft: 0,
+      isAirborne: false,
+      airborneTicks: 0
     };
 
     if (!fighter) return summary;
 
     if (Number(fighter.airborneTicks) > 0) {
+      summary.isAirborne = true;
+      summary.airborneTicks = Number(fighter.airborneTicks);
       summary.evade += Number(fighter.airborneTicks) * 28;
       summary.hasDefenseBuff = true;
     }
@@ -324,8 +338,8 @@
   }
 
   /*
-   * Evaluates a single fighter's board state including LP, Chi, Faint danger curve,
-   * and Delayed-Reward Buffs scaled by Chi Readiness & Time Horizon.
+- Evaluates a single fighter's board state including LP, Chi, Faint danger curve,
+- and Delayed-Reward Buffs scaled by Chi Readiness & Time Horizon.
    */
   function evaluateFighter(fighter, opponent, ownMoves) {
     if (!fighter) return 0;
@@ -339,6 +353,7 @@
 
     const status = summarizeStatuses(fighter);
     const needsDynamo = kitRequiresEnableSpecials(ownMoves);
+    const needsAirborne = kitRequiresAirborne(ownMoves);
 
     // 1. CHI READINESS FACTOR: Delayed offensive buffs need leftover Chi to cash out!
     const chiReadyFactor =
@@ -370,6 +385,16 @@
         score += 95 * Math.min(1.0, timeHorizonFactor + 0.35);
       } else {
         score -= 75 * timeHorizonFactor;
+      }
+    }
+
+    // Skyrider's Airborne state value:
+    // Being airborne unlocks D+L, D+I, S+L, and S+I.
+    if (needsAirborne) {
+      if (status.isAirborne) {
+        score += (55 + (chi >= 5 ? 25 : 0)) * Math.min(1.0, timeHorizonFactor + 0.35);
+      } else if (chi >= 5) {
+        score -= 22 * timeHorizonFactor;
       }
     }
 
@@ -425,7 +450,7 @@
   }
 
   /*
-   * 1. RiderBrains.evaluate(state, slot)
+- 1. RiderBrains.evaluate(state, slot)
    */
   function evaluate(state, slot) {
     if (!state) return 0;
@@ -456,8 +481,8 @@
   }
 
   /*
-   * 2. RiderBrains.intent(state, slot, difficulty)
-   * Returns tactical strategy name and preferred move keys for rollouts & search.
+- 2. RiderBrains.intent(state, slot, difficulty)
+- Returns tactical strategy name and preferred move keys for rollouts & search.
    */
   function intent(state, slot, difficulty = "master") {
     const enemySlot = otherSlot(slot);
@@ -478,6 +503,7 @@
 
     const status = summarizeStatuses(own);
     const needsDynamo = kitRequiresEnableSpecials(moves);
+    const needsAirborne = kitRequiresAirborne(moves);
     const preferred = [];
 
     const legalKey = (k) => {
@@ -487,6 +513,9 @@
         return C.isLegal(state, slot, { key: k, charge: 100 });
       }
       if (mv.requiresSpecialsEnabled && !status.hasSpecialsEnabled) {
+        return false;
+      }
+      if (mv.requiresAirborne && !status.isAirborne) {
         return false;
       }
       return getMoveChiCost(mv) <= ownChi;
@@ -508,6 +537,26 @@
       }
       return {
         name: "unlock_dynamo_specials",
+        preferred: preferred.slice(0, 4)
+      };
+    }
+
+    // Case 0b: Skyrider's Sailing Jump (W+I) unlock priority to access aerial D/S moves
+    if (
+      needsAirborne &&
+      !status.isAirborne &&
+      ownChi >= 4 &&
+      enemyLp > 160 &&
+      ownLp > 320 &&
+      ownFaint < 75 &&
+      legalKey("W+I")
+    ) {
+      preferred.push("W+I");
+      for (const k of ["S+K", "S+J", "D+K", "A+I"]) {
+        if (legalKey(k)) preferred.push(k);
+      }
+      return {
+        name: "unlock_airborne_kit",
         preferred: preferred.slice(0, 4)
       };
     }
@@ -565,7 +614,10 @@
 
     // Case 5: Healthy LP (Time Horizon available) + High Chi (>= 7) + No Buff -> Setup W buff
     if (!status.hasPowerBuff && status.positiveCount === 0 && ownChi >= 7 && ownLp >= 680 && enemyLp >= 580) {
-      for (const k of ["W+K", "W+J", "D+I", "S+J"]) {
+      const setupKeys = needsAirborne && !status.isAirborne
+        ? ["W+I", "W+K", "W+J", "S+J"]
+        : ["W+K", "W+J", "D+I", "S+J"];
+      for (const k of setupKeys) {
         if (legalKey(k)) preferred.push(k);
       }
       return {
@@ -597,7 +649,7 @@
   }
 
   /*
-   * Internal core tactical scoring shared by `prior` and `bonus`.
+- Internal core tactical scoring shared by `prior` and `bonus`.
    */
   function scoreActionTactics(state, slot, action, difficulty = "master") {
     if (!state || !action) return 0;
@@ -621,12 +673,16 @@
     const status = summarizeStatuses(own);
     const enemyStatus = summarizeStatuses(enemy);
     const needsDynamo = kitRequiresEnableSpecials(slotMoves);
+    const needsAirborne = kitRequiresAirborne(slotMoves);
 
-    // Hard safety: never score locked S-moves positively if Electro Dynamo is not active
+    // Hard safety: never score locked S-moves or grounded aerial moves positively
     if (
       (move.requiresSpecialsEnabled || (needsDynamo && move.direction === "S")) &&
       !status.hasSpecialsEnabled
     ) {
+      return -100;
+    }
+    if (move.requiresAirborne && !status.isAirborne) {
       return -100;
     }
 
@@ -650,6 +706,7 @@
 
     const instantHealW = isInstantSurvivalW(move);
     const enablesSpecials = isEnableSpecialsMove(move);
+    const grantsAirborne = Boolean(move.grantsAirborne);
     const faintRelief = getSelfFaintRelief(move);
     const inflictedFaint = getInflictedFaint(move);
 
@@ -672,6 +729,22 @@
       } else if (status.specialsRoundsLeft > 2) {
         // Already unlocked with plenty of turns remaining; do not waste a turn re-casting!
         points -= 55;
+      }
+    }
+
+    // 0b. SKYRIDER'S AIRBORNE GATEWAY (grantsAirborne: true):
+    if (grantsAirborne && needsAirborne) {
+      if (!status.isAirborne) {
+        if (ownChi >= 4 && enemyLp > 150 && ownLp > 300) {
+          points += 34 + Math.min(18, ownChi * 2.0);
+        } else if (ownLp > 420 && enemyLp > 320) {
+          points += 14;
+        } else {
+          points -= 18;
+        }
+      } else {
+        // Already airborne: cash out aerial attacks instead of re-jumping!
+        points -= 45;
       }
     }
 
@@ -736,7 +809,7 @@
     }
 
     // 5. DIRECTION-SPECIFIC TACTICAL DISCIPLINE (W / A / S / D)
-    if (dir === "W" && !enablesSpecials && damage === 0) {
+    if (dir === "W" && !enablesSpecials && !(grantsAirborne && needsAirborne) && damage === 0) {
       // CRITICAL RULE: Delayed W buffs need future turns!
       if (lowTimeHorizon && !instantHealW && !(faintRelief >= 25 && ownFaintPct >= 72)) {
         points -= 48;
@@ -787,6 +860,9 @@
       if (status.hasPowerBuff && ownChi < 4) {
         points += 14;
       }
+      if (move.requiresAirborne && status.isAirborne) {
+        points += 10;
+      }
       if (move.rangeType === "REACH") {
         points += 6;
       }
@@ -794,6 +870,9 @@
       points += damage * 0.032;
       if (move.rangeType === "REACH") {
         points += 8;
+      }
+      if (move.requiresAirborne && status.isAirborne) {
+        points += 16;
       }
       if (status.hasPowerBuff) {
         // CASH OUT ACTIVE POWER BUFF!
@@ -811,8 +890,8 @@
   }
 
   /*
-   * 3. RiderBrains.prior(state, slot, action, difficulty)
-   * Returns a strictly positive weight (>= 0.05) used by ForeseeEngine.policy().
+- 3. RiderBrains.prior(state, slot, action, difficulty)
+- Returns a strictly positive weight (>= 0.05) used by ForeseeEngine.policy().
    */
   function prior(state, slot, action, difficulty = "master") {
     const raw = scoreActionTactics(state, slot, action, difficulty);
@@ -820,10 +899,10 @@
     const weight = 1.0 + raw / 28;
     return clamp(weight, 0.08, 6.5);
   }
- 
+
   /*
-   * 4. RiderBrains.bonus(state, slot, action, difficulty)
-   * Returns an additive root score adjustment used by ForeseeEngine.search().
+- 4. RiderBrains.bonus(state, slot, action, difficulty)
+- Returns an additive root score adjustment used by ForeseeEngine.search().
    */
   function bonus(state, slot, action, difficulty = "master") {
     if (difficulty === "easy") {
