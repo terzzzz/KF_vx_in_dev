@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1"
   >
 
-  <title>Kamen Fight — RIDER Training (49 Matchup Matrices)</title>
+  <title>Kamen Fight — RIDER Training (64 Matchup Matrices)</title>
 
   <style>
     body {
@@ -30,7 +30,7 @@
       display: none !important;
     }
 
-    .matrix49-bar {
+    .matrix64-bar {
       margin: 12px 0 20px;
       padding: 14px 16px;
       background: #0d1520;
@@ -41,14 +41,14 @@
       gap: 10px;
     }
 
-    .matrix49-row {
+    .matrix64-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 10px;
     }
 
-    .matrix49-badge {
+    .matrix64-badge {
       padding: 4px 10px;
       border-radius: 4px;
       font-size: 0.82rem;
@@ -58,7 +58,7 @@
       color: #00ffcc;
     }
 
-    .matrix49-btn {
+    .matrix64-btn {
       cursor: pointer;
       padding: 6px 12px;
       border-radius: 5px;
@@ -69,12 +69,12 @@
       font-size: 0.84rem;
     }
 
-    .matrix49-btn:hover {
+    .matrix64-btn:hover {
       background: #00ffcc;
       color: #061018;
     }
 
-    .matrix49-input {
+    .matrix64-input {
       flex: 1;
       min-width: 260px;
       padding: 6px 10px;
@@ -86,14 +86,14 @@
       font-size: 0.82rem;
     }
 
-    .matrix49-grid {
+    .matrix64-grid {
       display: grid;
-      grid-template-columns: repeat(7, minmax(95px, 1fr));
+      grid-template-columns: repeat(8, minmax(95px, 1fr));
       gap: 4px;
       margin-top: 6px;
     }
 
-    .matrix49-cell {
+    .matrix64-cell {
       padding: 4px 6px;
       font-size: 0.72rem;
       font-family: monospace;
@@ -104,7 +104,7 @@
       color: #9cc2d8;
     }
 
-    .matrix49-cell.ready {
+    .matrix64-cell.ready {
       border-color: #00ffcc;
       color: #00ffcc;
       background: #0a2422;
@@ -129,83 +129,83 @@
     <a href="index.html">← Return to game</a>
   </p>
 
-  <!-- 49-Matchup Matrix & Google Script Control Bar -->
-  <section id="matrix49-control-bar" class="matrix49-bar">
-    <div class="matrix49-row">
-      <span class="matrix49-badge">
+  <!-- 64-Matchup Matrix & Google Script Control Bar -->
+  <section id="matrix64-control-bar" class="matrix64-bar">
+    <div class="matrix64-row">
+      <span class="matrix64-badge">
         GDrive Folder: 15P5HeKqLxMYw3ykirJj2HMT726SZnkId
       </span>
-      <span id="matrix49-mode-badge" class="matrix49-badge">
+      <span id="matrix64-mode-badge" class="matrix64-badge">
         MODE: TRAIN (Live Search OFF)
       </span>
-      <span id="matrix49-count-badge" class="matrix49-badge">
-        MATRICES: 49 / 49 MAPPED
+      <span id="matrix64-count-badge" class="matrix64-badge">
+        MATRICES: 64 / 64 MAPPED
       </span>
 
       <button type="button"
-              class="matrix49-btn"
+              class="matrix64-btn"
               onclick="window.setTrainingExecutionMode('train')">
         Train Mode (Live Search OFF)
       </button>
 
       <button type="button"
-              class="matrix49-btn"
+              class="matrix64-btn"
               onclick="window.setTrainingExecutionMode('eval')">
         Eval Mode (Live Search ON)
       </button>
 
       <button type="button"
-              class="matrix49-btn"
-              onclick="window.initAll49MatchupMatrices()">
-        Init All 49 Matrices
+              class="matrix64-btn"
+              onclick="window.initAll64MatchupMatrices()">
+        Init All 64 Matrices
       </button>
 
       <button type="button"
-              class="matrix49-btn"
-              onclick="window.syncAll49MatricesToDrive()">
-        Sync 49 Matrices → Google Drive
+              class="matrix64-btn"
+              onclick="window.syncAll64MatricesToDrive()">
+        Sync 64 Matrices → Google Drive
       </button>
 
       <button type="button"
-              class="matrix49-btn"
-              onclick="window.loadAll49MatricesFromDrive()">
-        Pull 49 Matrices ← Google Drive
+              class="matrix64-btn"
+              onclick="window.loadAll64MatricesFromDrive()">
+        Pull 64 Matrices ← Google Drive
       </button>
 
       <button type="button"
-              class="matrix49-btn"
-              onclick="const el=document.getElementById('matrix49-grid-drawer'); el.hidden=!el.hidden;">
-        Toggle 7×7 Grid
+              class="matrix64-btn"
+              onclick="const el=document.getElementById('matrix64-grid-drawer'); el.hidden=!el.hidden;">
+        Toggle 8×8 Grid
       </button>
 
       <button type="button"
-              class="matrix49-btn"
+              class="matrix64-btn"
               onclick="const el=document.getElementById('gas-script-drawer'); el.hidden=!el.hidden;">
         Google Script (Code.gs)
       </button>
     </div>
 
-    <div class="matrix49-row">
+    <div class="matrix64-row">
       <label for="gas-webapp-url-input" style="font-size:0.82rem;color:#9cc2d8;">
         Google Script Web App URL:
       </label>
       <input id="gas-webapp-url-input"
              type="url"
-             class="matrix49-input"
+             class="matrix64-input"
              placeholder="https://script.google.com/macros/s/.../exec"
              onchange="window.MatrixStorage.setGasWebAppUrl(this.value)">
-      <span id="matrix49-sync-status" style="font-size:0.82rem;color:#00ffcc;">
+      <span id="matrix64-sync-status" style="font-size:0.82rem;color:#00ffcc;">
         Ready.
       </span>
     </div>
 
-    <div id="matrix49-grid-drawer" hidden>
-      <div id="matrix49-grid" class="matrix49-grid"></div>
+    <div id="matrix64-grid-drawer" hidden>
+      <div id="matrix64-grid" class="matrix64-grid"></div>
     </div>
 
     <div id="gas-script-drawer" hidden>
       <div style="font-size:0.8rem;color:#9cc2d8;">
-        Deploy this Google Apps Script as a Web App to read/write all 49 matrix files directly inside Google Drive folder <code>15P5HeKqLxMYw3ykirJj2HMT726SZnkId</code>:
+        Deploy this Google Apps Script as a Web App to read/write all 64 matrix files directly inside Google Drive folder <code>15P5HeKqLxMYw3ykirJj2HMT726SZnkId</code>:
       </div>
       <pre id="gas-script-code" class="gas-code-pre"></pre>
     </div>
@@ -217,95 +217,69 @@
 
   <noscript>JavaScript is required.</noscript>
 
-  <!-- Hardcoded 49-Matchup Matrix Manifest & Google Script Section -->
+  <!-- 64-Matchup Matrix Manifest & Google Script Section -->
   <script>
     (function (g) {
       "use strict";
 
       const GDRIVE_FOLDER_ID = "15P5HeKqLxMYw3ykirJj2HMT726SZnkId";
       const GAS_URL_STORAGE_KEY = "kf_gdrive_gas_webapp_url";
-      const RAM_MATRIX49 = (g.__KF_MATRIX49_RAM__ = g.__KF_MATRIX49_RAM__ || {});
+      const RAM_MATRIX64 = (g.__KF_MATRIX64_RAM__ = g.__KF_MATRIX49_RAM__ = g.__KF_MATRIX64_RAM__ || g.__KF_MATRIX49_RAM__ || {});
 
-      const ACTIVE_RIDERS_7 = Object.freeze([
+      const ACTIVE_RIDERS_8 = [
         { index: 0, id: "ichigo",   code: "r0", soulCode: "001", name: "Kamen Rider Ichigo" },
         { index: 1, id: "nigo",     code: "r1", soulCode: "002", name: "Kamen Rider Nigo" },
         { index: 2, id: "v3",       code: "r2", soulCode: "003", name: "Kamen Rider V3" },
         { index: 3, id: "riderman", code: "r3", soulCode: "004", name: "Riderman" },
         { index: 4, id: "x",        code: "r4", soulCode: "005", name: "Kamen Rider X" },
         { index: 5, id: "amazon",   code: "r5", soulCode: "006", name: "Kamen Rider Amazon" },
-        { index: 6, id: "stronger", code: "r6", soulCode: "007", name: "Kamen Rider Stronger" }
-      ]);
+        { index: 6, id: "stronger", code: "r6", soulCode: "007", name: "Kamen Rider Stronger" },
+        { index: 7, id: "skyrider", code: "r7", soulCode: "008", name: "Skyrider" }
+      ];
 
-      // Hardcoded 49 Matchup Matrices (7 Riders x 7 Riders)
-      const HARDCODED_49_MATRICES = Object.freeze({
-        "r0_vs_r0": { key: "r0_vs_r0", p1: 0, p2: 0, p1Id: "ichigo",   p2Id: "ichigo",   soulKey: "001_001", file: "matrix_r0_vs_r0.json" },
-        "r0_vs_r1": { key: "r0_vs_r1", p1: 0, p2: 1, p1Id: "ichigo",   p2Id: "nigo",     soulKey: "001_002", file: "matrix_r0_vs_r1.json" },
-        "r0_vs_r2": { key: "r0_vs_r2", p1: 0, p2: 2, p1Id: "ichigo",   p2Id: "v3",       soulKey: "001_003", file: "matrix_r0_vs_r2.json" },
-        "r0_vs_r3": { key: "r0_vs_r3", p1: 0, p2: 3, p1Id: "ichigo",   p2Id: "riderman", soulKey: "001_004", file: "matrix_r0_vs_r3.json" },
-        "r0_vs_r4": { key: "r0_vs_r4", p1: 0, p2: 4, p1Id: "ichigo",   p2Id: "x",        soulKey: "001_005", file: "matrix_r0_vs_r4.json" },
-        "r0_vs_r5": { key: "r0_vs_r5", p1: 0, p2: 5, p1Id: "ichigo",   p2Id: "amazon",   soulKey: "001_006", file: "matrix_r0_vs_r5.json" },
-        "r0_vs_r6": { key: "r0_vs_r6", p1: 0, p2: 6, p1Id: "ichigo",   p2Id: "stronger", soulKey: "001_007", file: "matrix_r0_vs_r6.json" },
+      // 64 Matchup Matrices (8 Riders x 8 Riders)
+      const HARDCODED_64_MATRICES = {};
+      for (const rA of ACTIVE_RIDERS_8) {
+        for (const rB of ACTIVE_RIDERS_8) {
+          const key = `r${rA.index}_vs_r${rB.index}`;
+          HARDCODED_64_MATRICES[key] = {
+            key,
+            p1: rA.index,
+            p2: rB.index,
+            p1Id: rA.id,
+            p2Id: rB.id,
+            soulKey: `${rA.soulCode}_${rB.soulCode}`,
+            file: `matrix_${key}.json`
+          };
+        }
+      }
 
-        "r1_vs_r0": { key: "r1_vs_r0", p1: 1, p2: 0, p1Id: "nigo",     p2Id: "ichigo",   soulKey: "002_001", file: "matrix_r1_vs_r0.json" },
-        "r1_vs_r1": { key: "r1_vs_r1", p1: 1, p2: 1, p1Id: "nigo",     p2Id: "nigo",     soulKey: "002_002", file: "matrix_r1_vs_r1.json" },
-        "r1_vs_r2": { key: "r1_vs_r2", p1: 1, p2: 2, p1Id: "nigo",     p2Id: "v3",       soulKey: "002_003", file: "matrix_r1_vs_r2.json" },
-        "r1_vs_r3": { key: "r1_vs_r3", p1: 1, p2: 3, p1Id: "nigo",     p2Id: "riderman", soulKey: "002_004", file: "matrix_r1_vs_r3.json" },
-        "r1_vs_r4": { key: "r1_vs_r4", p1: 1, p2: 4, p1Id: "nigo",     p2Id: "x",        soulKey: "002_005", file: "matrix_r1_vs_r4.json" },
-        "r1_vs_r5": { key: "r1_vs_r5", p1: 1, p2: 5, p1Id: "nigo",     p2Id: "amazon",   soulKey: "002_006", file: "matrix_r1_vs_r5.json" },
-        "r1_vs_r6": { key: "r1_vs_r6", p1: 1, p2: 6, p1Id: "nigo",     p2Id: "stronger", soulKey: "002_007", file: "matrix_r1_vs_r6.json" },
+      function syncManifestWithDataset(riders) {
+        if (!Array.isArray(riders)) return;
+        for (let i = 0; i < ACTIVE_RIDERS_8.length && i < riders.length; i++) {
+          if (riders[i]?.id) ACTIVE_RIDERS_8[i].id = riders[i].id;
+          if (riders[i]?.name) ACTIVE_RIDERS_8[i].name = riders[i].name;
+        }
+        for (const rA of ACTIVE_RIDERS_8) {
+          for (const rB of ACTIVE_RIDERS_8) {
+            const entry = HARDCODED_64_MATRICES[`r${rA.index}_vs_r${rB.index}`];
+            if (entry) {
+              entry.p1Id = rA.id;
+              entry.p2Id = rB.id;
+            }
+          }
+        }
+      }
 
-        "r2_vs_r0": { key: "r2_vs_r0", p1: 2, p2: 0, p1Id: "v3",       p2Id: "ichigo",   soulKey: "003_001", file: "matrix_r2_vs_r0.json" },
-        "r2_vs_r1": { key: "r2_vs_r1", p1: 2, p2: 1, p1Id: "v3",       p2Id: "nigo",     soulKey: "003_002", file: "matrix_r2_vs_r1.json" },
-        "r2_vs_r2": { key: "r2_vs_r2", p1: 2, p2: 2, p1Id: "v3",       p2Id: "v3",       soulKey: "003_003", file: "matrix_r2_vs_r2.json" },
-        "r2_vs_r3": { key: "r2_vs_r3", p1: 2, p2: 3, p1Id: "v3",       p2Id: "riderman", soulKey: "003_004", file: "matrix_r2_vs_r3.json" },
-        "r2_vs_r4": { key: "r2_vs_r4", p1: 2, p2: 4, p1Id: "v3",       p2Id: "x",        soulKey: "003_005", file: "matrix_r2_vs_r4.json" },
-        "r2_vs_r5": { key: "r2_vs_r5", p1: 2, p2: 5, p1Id: "v3",       p2Id: "amazon",   soulKey: "003_006", file: "matrix_r2_vs_r5.json" },
-        "r2_vs_r6": { key: "r2_vs_r6", p1: 2, p2: 6, p1Id: "v3",       p2Id: "stronger", soulKey: "003_007", file: "matrix_r2_vs_r6.json" },
-
-        "r3_vs_r0": { key: "r3_vs_r0", p1: 3, p2: 0, p1Id: "riderman", p2Id: "ichigo",   soulKey: "004_001", file: "matrix_r3_vs_r0.json" },
-        "r3_vs_r1": { key: "r3_vs_r1", p1: 3, p2: 1, p1Id: "riderman", p2Id: "nigo",     soulKey: "004_002", file: "matrix_r3_vs_r1.json" },
-        "r3_vs_r2": { key: "r3_vs_r2", p1: 3, p2: 2, p1Id: "riderman", p2Id: "v3",       soulKey: "004_003", file: "matrix_r3_vs_r2.json" },
-        "r3_vs_r3": { key: "r3_vs_r3", p1: 3, p2: 3, p1Id: "riderman", p2Id: "riderman", soulKey: "004_004", file: "matrix_r3_vs_r3.json" },
-        "r3_vs_r4": { key: "r3_vs_r4", p1: 3, p2: 4, p1Id: "riderman", p2Id: "x",        soulKey: "004_005", file: "matrix_r3_vs_r4.json" },
-        "r3_vs_r5": { key: "r3_vs_r5", p1: 3, p2: 5, p1Id: "riderman", p2Id: "amazon",   soulKey: "004_006", file: "matrix_r3_vs_r5.json" },
-        "r3_vs_r6": { key: "r3_vs_r6", p1: 3, p2: 6, p1Id: "riderman", p2Id: "stronger", soulKey: "004_007", file: "matrix_r3_vs_r6.json" },
-
-        "r4_vs_r0": { key: "r4_vs_r0", p1: 4, p2: 0, p1Id: "x",        p2Id: "ichigo",   soulKey: "005_001", file: "matrix_r4_vs_r0.json" },
-        "r4_vs_r1": { key: "r4_vs_r1", p1: 4, p2: 1, p1Id: "x",        p2Id: "nigo",     soulKey: "005_002", file: "matrix_r4_vs_r1.json" },
-        "r4_vs_r2": { key: "r4_vs_r2", p1: 4, p2: 2, p1Id: "x",        p2Id: "v3",       soulKey: "005_003", file: "matrix_r4_vs_r2.json" },
-        "r4_vs_r3": { key: "r4_vs_r3", p1: 4, p2: 3, p1Id: "x",        p2Id: "riderman", soulKey: "005_004", file: "matrix_r4_vs_r3.json" },
-        "r4_vs_r4": { key: "r4_vs_r4", p1: 4, p2: 4, p1Id: "x",        p2Id: "x",        soulKey: "005_005", file: "matrix_r4_vs_r4.json" },
-        "r4_vs_r5": { key: "r4_vs_r5", p1: 4, p2: 5, p1Id: "x",        p2Id: "amazon",   soulKey: "005_006", file: "matrix_r4_vs_r5.json" },
-        "r4_vs_r6": { key: "r4_vs_r6", p1: 4, p2: 6, p1Id: "x",        p2Id: "stronger", soulKey: "005_007", file: "matrix_r4_vs_r6.json" },
-
-        "r5_vs_r0": { key: "r5_vs_r0", p1: 5, p2: 0, p1Id: "amazon",   p2Id: "ichigo",   soulKey: "006_001", file: "matrix_r5_vs_r0.json" },
-        "r5_vs_r1": { key: "r5_vs_r1", p1: 5, p2: 1, p1Id: "amazon",   p2Id: "nigo",     soulKey: "006_002", file: "matrix_r5_vs_r1.json" },
-        "r5_vs_r2": { key: "r5_vs_r2", p1: 5, p2: 2, p1Id: "amazon",   p2Id: "v3",       soulKey: "006_003", file: "matrix_r5_vs_r2.json" },
-        "r5_vs_r3": { key: "r5_vs_r3", p1: 5, p2: 3, p1Id: "amazon",   p2Id: "riderman", soulKey: "006_004", file: "matrix_r5_vs_r3.json" },
-        "r5_vs_r4": { key: "r5_vs_r4", p1: 5, p2: 4, p1Id: "amazon",   p2Id: "x",        soulKey: "006_005", file: "matrix_r5_vs_r4.json" },
-        "r5_vs_r5": { key: "r5_vs_r5", p1: 5, p2: 5, p1Id: "amazon",   p2Id: "amazon",   soulKey: "006_006", file: "matrix_r5_vs_r5.json" },
-        "r5_vs_r6": { key: "r5_vs_r6", p1: 5, p2: 6, p1Id: "amazon",   p2Id: "stronger", soulKey: "006_007", file: "matrix_r5_vs_r6.json" },
-
-        "r6_vs_r0": { key: "r6_vs_r0", p1: 6, p2: 0, p1Id: "stronger", p2Id: "ichigo",   soulKey: "007_001", file: "matrix_r6_vs_r0.json" },
-        "r6_vs_r1": { key: "r6_vs_r1", p1: 6, p2: 1, p1Id: "stronger", p2Id: "nigo",     soulKey: "007_002", file: "matrix_r6_vs_r1.json" },
-        "r6_vs_r2": { key: "r6_vs_r2", p1: 6, p2: 2, p1Id: "stronger", p2Id: "v3",       soulKey: "007_003", file: "matrix_r6_vs_r2.json" },
-        "r6_vs_r3": { key: "r6_vs_r3", p1: 6, p2: 3, p1Id: "stronger", p2Id: "riderman", soulKey: "007_004", file: "matrix_r6_vs_r3.json" },
-        "r6_vs_r4": { key: "r6_vs_r4", p1: 6, p2: 4, p1Id: "stronger", p2Id: "x",        soulKey: "007_005", file: "matrix_r6_vs_r4.json" },
-        "r6_vs_r5": { key: "r6_vs_r5", p1: 6, p2: 5, p1Id: "stronger", p2Id: "amazon",   soulKey: "007_006", file: "matrix_r6_vs_r5.json" },
-        "r6_vs_r6": { key: "r6_vs_r6", p1: 6, p2: 6, p1Id: "stronger", p2Id: "stronger", soulKey: "007_007", file: "matrix_r6_vs_r6.json" }
-      });
+      const VALID_64_FILE_LINES = ACTIVE_RIDERS_8.map(rA =>
+        "  " + ACTIVE_RIDERS_8.map(rB => `'matrix_r${rA.index}_vs_r${rB.index}.json'`).join(",")
+      ).join(",\n");
 
       const GOOGLE_APPS_SCRIPT_TEMPLATE = [
-        "/* Google Apps Script (Code.gs) for Kamen Fight 49 Matchup Matrices */",
+        "/* Google Apps Script (Code.gs) for Kamen Fight 64 Matchup Matrices */",
         "const FOLDER_ID = '15P5HeKqLxMYw3ykirJj2HMT726SZnkId';",
-        "const VALID_49_FILES = new Set([",
-        "  'matrix_r0_vs_r0.json','matrix_r0_vs_r1.json','matrix_r0_vs_r2.json','matrix_r0_vs_r3.json','matrix_r0_vs_r4.json','matrix_r0_vs_r5.json','matrix_r0_vs_r6.json',",
-        "  'matrix_r1_vs_r0.json','matrix_r1_vs_r1.json','matrix_r1_vs_r2.json','matrix_r1_vs_r3.json','matrix_r1_vs_r4.json','matrix_r1_vs_r5.json','matrix_r1_vs_r6.json',",
-        "  'matrix_r2_vs_r0.json','matrix_r2_vs_r1.json','matrix_r2_vs_r2.json','matrix_r2_vs_r3.json','matrix_r2_vs_r4.json','matrix_r2_vs_r5.json','matrix_r2_vs_r6.json',",
-        "  'matrix_r3_vs_r0.json','matrix_r3_vs_r1.json','matrix_r3_vs_r2.json','matrix_r3_vs_r3.json','matrix_r3_vs_r4.json','matrix_r3_vs_r5.json','matrix_r3_vs_r6.json',",
-        "  'matrix_r4_vs_r0.json','matrix_r4_vs_r1.json','matrix_r4_vs_r2.json','matrix_r4_vs_r3.json','matrix_r4_vs_r4.json','matrix_r4_vs_r5.json','matrix_r4_vs_r6.json',",
-        "  'matrix_r5_vs_r0.json','matrix_r5_vs_r1.json','matrix_r5_vs_r2.json','matrix_r5_vs_r3.json','matrix_r5_vs_r4.json','matrix_r5_vs_r5.json','matrix_r5_vs_r6.json',",
-        "  'matrix_r6_vs_r0.json','matrix_r6_vs_r1.json','matrix_r6_vs_r2.json','matrix_r6_vs_r3.json','matrix_r6_vs_r4.json','matrix_r6_vs_r5.json','matrix_r6_vs_r6.json'",
+        "const VALID_64_FILES = new Set([",
+        VALID_64_FILE_LINES,
         "]);",
         "",
         "function doGet(e) {",
@@ -326,7 +300,7 @@
         "}",
         "",
         "function loadMatrixFromDriveFolder(folderId, fileName) {",
-        "  if (!VALID_49_FILES.has(fileName)) return null;",
+        "  if (!VALID_64_FILES.has(fileName)) return null;",
         "  const folder = DriveApp.getFolderById(folderId || FOLDER_ID);",
         "  const files = folder.getFilesByName(fileName);",
         "  if (!files.hasNext()) return null;",
@@ -334,7 +308,7 @@
         "}",
         "",
         "function saveMatrixToDriveFolder(folderId, fileName, jsonString) {",
-        "  if (!VALID_49_FILES.has(fileName)) throw new Error('Invalid 49-matrix filename: ' + fileName);",
+        "  if (!VALID_64_FILES.has(fileName)) throw new Error('Invalid 64-matrix filename: ' + fileName);",
         "  const folder = DriveApp.getFolderById(folderId || FOLDER_ID);",
         "  const files = folder.getFilesByName(fileName);",
         "  if (files.hasNext()) {",
@@ -348,22 +322,23 @@
       ].join("\n");
 
       function resolveRiderIndex(rider) {
+        const maxIdx = ACTIVE_RIDERS_8.length - 1;
         if (typeof rider === "number" && Number.isInteger(rider)) {
-          return Math.max(0, Math.min(6, rider));
+          return Math.max(0, Math.min(maxIdx, rider));
         }
         const s = String(rider || "").trim().toLowerCase();
-        const byId = ACTIVE_RIDERS_7.find(
+        const byId = ACTIVE_RIDERS_8.find(
           r => r.id === s || r.code === s || r.soulCode === s || s.includes(r.id)
         );
         if (byId) return byId.index;
         const m = s.match(/(\d+)/);
-        return m ? Math.max(0, Math.min(6, Number(m[1]))) : 0;
+        return m ? Math.max(0, Math.min(maxIdx, Number(m[1]))) : 0;
       }
 
       function getEntry(riderA, riderB) {
         const a = resolveRiderIndex(riderA);
         const b = resolveRiderIndex(riderB);
-        return HARDCODED_49_MATRICES[`r${a}_vs_r${b}`];
+        return HARDCODED_64_MATRICES[`r${a}_vs_r${b}`];
       }
 
       function getGasWebAppUrl() {
@@ -408,7 +383,7 @@
                   matrixPayload.soulCheckpoint ||
                   matrixPayload.checkpoint)
               ) {
-                RAM_MATRIX49[entry.key] = matrixPayload;
+                RAM_MATRIX64[entry.key] = matrixPayload;
                 if (typeof g.SoulAgent?.ingestDriveMatchup === "function") {
                   try {
                     g.SoulAgent.ingestDriveMatchup(matrixPayload, entry.p1Id, entry.p2Id);
@@ -432,7 +407,7 @@
             });
             if (gasData) {
               const parsed = typeof gasData === "string" ? JSON.parse(gasData) : gasData;
-              RAM_MATRIX49[entry.key] = parsed;
+              RAM_MATRIX64[entry.key] = parsed;
               if (typeof g.SoulAgent?.ingestDriveMatchup === "function") {
                 try {
                   g.SoulAgent.ingestDriveMatchup(parsed, entry.p1Id, entry.p2Id);
@@ -443,18 +418,20 @@
           } catch (_) {}
         }
 
-        if (RAM_MATRIX49[entry.key]) {
-          return RAM_MATRIX49[entry.key];
+        if (RAM_MATRIX64[entry.key]) {
+          return RAM_MATRIX64[entry.key];
         }
 
-        try {
-          const localRes = await fetch(`models/matrices_49/${entry.file}`, { cache: "no-store" });
-          if (localRes.ok) {
-            const localJson = await localRes.json();
-            RAM_MATRIX49[entry.key] = localJson;
-            return localJson;
-          }
-        } catch (_) {}
+        for (const folder of ["models/matrices_64", "models/matrices_49"]) {
+          try {
+            const localRes = await fetch(`${folder}/${entry.file}`, { cache: "no-store" });
+            if (localRes.ok) {
+              const localJson = await localRes.json();
+              RAM_MATRIX64[entry.key] = localJson;
+              return localJson;
+            }
+          } catch (_) {}
+        }
 
         return null;
       }
@@ -490,7 +467,7 @@
           updatedAt: new Date().toISOString()
         };
 
-        RAM_MATRIX49[entry.key] = enriched;
+        RAM_MATRIX64[entry.key] = enriched;
 
         const gasUrl = getGasWebAppUrl();
         if (gasUrl) {
@@ -524,13 +501,18 @@
         return enriched;
       }
 
-      g.MATCHUP_49_MANIFEST = HARDCODED_49_MATRICES;
-      g.ACTIVE_RIDERS_7 = ACTIVE_RIDERS_7;
+      g.MATCHUP_64_MANIFEST = HARDCODED_64_MATRICES;
+      g.MATCHUP_49_MANIFEST = HARDCODED_64_MATRICES;
+      g.ACTIVE_RIDERS_8 = ACTIVE_RIDERS_8;
+      g.ACTIVE_RIDERS_7 = ACTIVE_RIDERS_8;
       g.MatrixStorage = {
         GDRIVE_FOLDER_ID,
-        HARDCODED_49_MATRICES,
-        ACTIVE_RIDERS_7,
+        HARDCODED_64_MATRICES,
+        HARDCODED_49_MATRICES: HARDCODED_64_MATRICES,
+        ACTIVE_RIDERS_8,
+        ACTIVE_RIDERS_7: ACTIVE_RIDERS_8,
         GOOGLE_APPS_SCRIPT_TEMPLATE,
+        syncManifestWithDataset,
         resolveRiderIndex,
         getEntry,
         getGasWebAppUrl,
@@ -541,21 +523,24 @@
     })(globalThis);
   </script>
 
-  <script src="js/common.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
-  <script src="js/combat_core.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
-  <script src="js/rider_brains.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
-  <script src="js/foresee_engine.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
+  <script src="js/common.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/combat_core.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/rider_brains.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/foresee_engine.js?v=v5-state256-action17-charge1-reset1-v8"></script>
 
-  <script src="js/charge_env.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
-  <script src="js/neural_core.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
-  <script src="js/soul_sim.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
-  <script src="js/soul_agent.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
-  <script src="js/ai.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
+  <script src="js/charge_env.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/neural_core.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/soul_sim.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/soul_agent.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/ai.js?v=v5-state256-action17-charge1-reset1-v8"></script>
 
-  <!-- Initialize Train Mode (Live Search OFF by default) & 49-Matchup Matrix Pool UI -->
+  <!-- Initialize Train Mode (Live Search OFF by default) & 64-Matchup Matrix Pool UI -->
   <script>
     (function (g) {
       "use strict";
+
+      const NUM_RIDERS = 8;
+      const TOTAL_MATRICES = NUM_RIDERS * NUM_RIDERS; // 64
 
       if (g.SoulEnv?.setExecutionMode) {
         g.SoulEnv.setExecutionMode("train");
@@ -564,16 +549,16 @@
       if (g.SoulNN?.MatchupMatrixPool) {
         g.MatchupPool = new g.SoulNN.MatchupMatrixPool({
           sizes: g.SoulNN.COMPACT_MATCHUP_SIZES,
-          numRiders: 7,
+          numRiders: NUM_RIDERS,
           folderId: "15P5HeKqLxMYw3ykirJj2HMT726SZnkId"
         });
       }
 
-      function render49Grid() {
-        const gridEl = document.getElementById("matrix49-grid");
+      function render64Grid() {
+        const gridEl = document.getElementById("matrix64-grid");
         if (!gridEl) return;
 
-        const entries = Object.values(g.MATCHUP_49_MANIFEST);
+        const entries = Object.values(g.MATCHUP_64_MANIFEST);
         let readyCount = 0;
         let trainedCount = 0;
 
@@ -601,7 +586,7 @@
               : "INIT";
 
           return `
-            <div class="matrix49-cell ${isReady ? "ready" : ""}"
+            <div class="matrix64-cell ${isReady ? "ready" : ""}"
                  title="${entry.file} (${entry.p1Id} vs ${entry.p2Id} | Games: ${games}, Steps: ${steps})">
               <div>${entry.key} (${entry.soulKey})</div>
               <div>${label}</div>
@@ -609,15 +594,16 @@
           `;
         }).join("");
 
-        const countBadge = document.getElementById("matrix49-count-badge");
+        const countBadge = document.getElementById("matrix64-count-badge");
         if (countBadge) {
           countBadge.textContent = trainedCount > 0
             ? `MATRICES: ${trainedCount} TRAINED / ${readyCount} ACTIVE`
-            : `MATRICES: ${readyCount} / 49 ACTIVE`;
+            : `MATRICES: ${readyCount} / ${TOTAL_MATRICES} ACTIVE`;
         }
       }
 
-      g.render49MatrixHeaderGrid = render49Grid;
+      g.render64MatrixHeaderGrid = render64Grid;
+      g.render49MatrixHeaderGrid = render64Grid;
 
       g.setTrainingExecutionMode = function (mode) {
         const target = mode === "eval" ? "eval" : "train";
@@ -629,7 +615,7 @@
             learner.setMode(target);
           }
         }
-        const badge = document.getElementById("matrix49-mode-badge");
+        const badge = document.getElementById("matrix64-mode-badge");
         if (badge) {
           badge.textContent = target === "train"
             ? "MODE: TRAIN (Live Search OFF)"
@@ -638,37 +624,39 @@
         return target;
       };
 
-      g.initAll49MatchupMatrices = function () {
+      g.initAll64MatchupMatrices = function () {
         if (!g.MatchupPool) return;
         const mode = g.SoulEnv?.getExecutionMode?.() || "train";
-        for (let rA = 0; rA < 7; rA++) {
-          for (let rB = 0; rB < 7; rB++) {
-            g.MatchupPool.getOrCreateSync(rA, rB, mode, 1 + rA * 7 + rB);
+        for (let rA = 0; rA < NUM_RIDERS; rA++) {
+          for (let rB = 0; rB < NUM_RIDERS; rB++) {
+            g.MatchupPool.getOrCreateSync(rA, rB, mode, 1 + rA * NUM_RIDERS + rB);
           }
         }
-        render49Grid();
+        render64Grid();
         g.SoulTrainer?.refreshUI?.();
-        const status = document.getElementById("matrix49-sync-status");
+        const status = document.getElementById("matrix64-sync-status");
         if (status) {
-          status.textContent = "Initialized all 49 matchup matrices in memory (preserving trained SoulAgent models).";
+          status.textContent = `Initialized all ${TOTAL_MATRICES} matchup matrices in memory (preserving trained SoulAgent models).`;
         }
       };
+      g.initAll49MatchupMatrices = g.initAll64MatchupMatrices;
 
-      g.syncAll49MatricesToDrive = async function () {
-        const status = document.getElementById("matrix49-sync-status");
+      g.syncAll64MatricesToDrive = async function () {
+        const status = document.getElementById("matrix64-sync-status");
         if (g.SoulAgent?.ready) {
-          await g.SoulAgent.ready();
+          const res = await g.SoulAgent.ready();
+          if (res?.data?.riders) g.MatrixStorage.syncManifestWithDataset(res.data.riders);
           await g.SoulAgent.flushStorage?.();
         }
-        g.initAll49MatchupMatrices();
+        g.initAll64MatchupMatrices();
 
         const results = [];
         let count = 0;
         let savedCount = 0;
         let trainedSyncedCount = 0;
 
-        for (let rA = 0; rA < 7; rA++) {
-          for (let rB = 0; rB < 7; rB++) {
+        for (let rA = 0; rA < NUM_RIDERS; rA++) {
+          for (let rB = 0; rB < NUM_RIDERS; rB++) {
             count++;
             const entry = g.MatrixStorage.getEntry(rA, rB);
             const soulCp =
@@ -678,7 +666,7 @@
             const gamesTag = soulCp ? `${soulCp.games} games` : "0 games";
 
             if (status) {
-              status.textContent = `Syncing ${count} / 49 (${entry.key} [${entry.soulKey}] — ${gamesTag}) to Google Drive…`;
+              status.textContent = `Syncing ${count} / ${TOTAL_MATRICES} (${entry.key} [${entry.soulKey}] — ${gamesTag}) to Google Drive…`;
             }
 
             try {
@@ -696,20 +684,22 @@
           }
         }
 
-        render49Grid();
+        render64Grid();
         g.SoulTrainer?.refreshUI?.();
 
         if (status) {
           status.textContent =
-            `Synced ${savedCount} / 49 matrices (${trainedSyncedCount} trained SoulAgent checkpoints) to Google Drive (Folder: 15P5HeKqLxMYw3ykirJj2HMT726SZnkId).`;
+            `Synced ${savedCount} / ${TOTAL_MATRICES} matrices (${trainedSyncedCount} trained SoulAgent checkpoints) to Google Drive (Folder: 15P5HeKqLxMYw3ykirJj2HMT726SZnkId).`;
         }
         return results;
       };
+      g.syncAll49MatricesToDrive = g.syncAll64MatricesToDrive;
 
-      g.loadAll49MatricesFromDrive = async function () {
-        const status = document.getElementById("matrix49-sync-status");
+      g.loadAll64MatricesFromDrive = async function () {
+        const status = document.getElementById("matrix64-sync-status");
         if (g.SoulAgent?.ready) {
-          await g.SoulAgent.ready();
+          const res = await g.SoulAgent.ready();
+          if (res?.data?.riders) g.MatrixStorage.syncManifestWithDataset(res.data.riders);
         }
 
         const mode = g.SoulEnv?.getExecutionMode?.() || "train";
@@ -717,12 +707,12 @@
         let loaded = 0;
         let importedSoulCount = 0;
 
-        for (let rA = 0; rA < 7; rA++) {
-          for (let rB = 0; rB < 7; rB++) {
+        for (let rA = 0; rA < NUM_RIDERS; rA++) {
+          for (let rB = 0; rB < NUM_RIDERS; rB++) {
             count++;
             const entry = g.MatrixStorage.getEntry(rA, rB);
             if (status) {
-              status.textContent = `Loading ${count} / 49 (${entry.key} [${entry.soulKey}]) from Google Drive…`;
+              status.textContent = `Loading ${count} / ${TOTAL_MATRICES} (${entry.key} [${entry.soulKey}]) from Google Drive…`;
             }
 
             const rawPayload = await g.MatrixStorage.loadMatchupMatrix(rA, rB);
@@ -737,7 +727,7 @@
             }
 
             // Ensure compact pool learner is also ready
-            g.MatchupPool.getOrCreateSync(rA, rB, mode, 1 + rA * 7 + rB);
+            g.MatchupPool.getOrCreateSync(rA, rB, mode, 1 + rA * NUM_RIDERS + rB);
           }
         }
 
@@ -745,15 +735,16 @@
           await g.SoulAgent.flushStorage();
         }
 
-        render49Grid();
+        render64Grid();
         g.SoulTrainer?.refreshUI?.();
 
         if (status) {
           status.textContent =
-            `Loaded ${loaded} / 49 Drive files (${importedSoulCount} trained SoulAgent matchups restored into table).`;
+            `Loaded ${loaded} / ${TOTAL_MATRICES} Drive files (${importedSoulCount} trained SoulAgent matchups restored into table).`;
         }
         return loaded;
       };
+      g.loadAll49MatricesFromDrive = g.loadAll64MatricesFromDrive;
 
       const urlInput = document.getElementById("gas-webapp-url-input");
       if (urlInput) {
@@ -765,11 +756,22 @@
         codePre.textContent = g.MatrixStorage.GOOGLE_APPS_SCRIPT_TEMPLATE;
       }
 
-      render49Grid();
+      if (g.SoulAgent?.ready) {
+        g.SoulAgent.ready()
+          .then(res => {
+            if (res?.data?.riders) {
+              g.MatrixStorage.syncManifestWithDataset(res.data.riders);
+            }
+            render64Grid();
+          })
+          .catch(() => {});
+      }
+
+      render64Grid();
     })(globalThis);
   </script>
 
-  <script src="js/soul_pipeline_tests.js?v=v5-state256-action17-charge1-reset1-tests3"></script>
-  <script src="js/training_ui.js?v=v5-state256-action17-charge1-reset1-tests2"></script>
+  <script src="js/soul_pipeline_tests.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/training_ui.js?v=v5-state256-action17-charge1-reset1-v8"></script>
 </body>
 </html>
