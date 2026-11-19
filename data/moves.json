@@ -502,6 +502,76 @@
     "A+K": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
     "A+L": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" }
   },
+  "skyrider": {
+    "W+I": {
+      "name": "Sailing Jump",
+      "type": "UTILITY",
+      "chiCost": 3,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "sailing_jump.mp4",
+      "grantsAirborne": 5,
+      "buff": {
+        "id": "airborne_boost",
+        "label": "AIR",
+        "type": "speed",
+        "duration": 5,
+        "effects": { "attack": 1.30, "evasion": 0.30 }
+      }
+    },
+    "W+J": {
+      "name": "Gravity Reduction",
+      "type": "UTILITY",
+      "chiCost": 1,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "gravity_reduction.mp4",
+      "buff": {
+        "id": "gravity_reduction",
+        "label": "GRAVITY",
+        "type": "speed",
+        "duration": 4,
+        "effects": { "speed": 1.30 }
+      }
+    },
+    "W+K": {
+      "name": "Tornado Focus",
+      "type": "UTILITY",
+      "chiCost": 1,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "tornado_focus.mp4",
+      "buff": {
+        "id": "tornado_focus",
+        "label": "TORNADO",
+        "type": "accuracy",
+        "duration": 3,
+        "effects": { "accuracy": 25, "sAttack": 1.25 }
+      }
+    },
+    "W+L": {
+      "name": "Tornado Emission",
+      "type": "SPECIAL",
+      "rangeType": "REACH",
+      "chiCost": 2,
+      "baseDamage": 80,
+      "baseFaintDamage": 35,
+      "hitChance": 76,
+      "video": "tornado_emission.mp4"
+    },
+    "D+J": { "name": "Punch", "type": "PHYSICAL", "chiCost": 0, "baseDamage": 55, "hitChance": 78, "video": "punch.mp4" },
+    "D+K": { "name": "Kick", "type": "PHYSICAL", "chiCost": 0, "baseDamage": 58, "hitChance": 77, "video": "kick.mp4" },
+    "D+L": { "name": "Sky Flying Saucer", "type": "PHYSICAL", "requiresAirborne": true, "chiCost": 1, "chiRefundOnHit": 3, "baseDamage": 132, "hitChance": 79, "video": "flying_saucer.mp4" },
+    "D+I": { "name": "Sky Chop", "type": "PHYSICAL", "requiresAirborne": true, "chiCost": 1, "chiRefundOnHit": 3, "baseDamage": 120, "baseFaintDamage": 25, "hitChance": 78, "video": "sky_chop.mp4" },
+    "S+J": { "name": "Sky Kick", "type": "SPECIAL", "chiCost": 4, "chiRefundOnHit": 0, "baseDamage": 440, "hitChance": 80, "video": "sky_kick.mp4" },
+    "S+K": { "name": "Sky Screw Kick", "type": "SPECIAL", "chiCost": 5, "chiRefundOnHit": 1, "baseDamage": 550, "baseFaintDamage": 30, "hitChance": 75, "video": "screw_kick.mp4" },
+    "S+L": { "name": "Sky Drill", "type": "SPECIAL", "requiresAirborne": true, "chiCost": 7, "chiRefundOnHit": 3, "baseDamage": 890, "hitChance": 76, "video": "sky_drill.mp4" },
+    "S+I": { "name": "Three-Point Drop", "type": "SPECIAL", "requiresAirborne": true, "chiCost": 9, "chiRefundOnHit": 4, "baseDamage": 1220, "baseFaintDamage": 45, "hitChance": 77, "video": "three_point_drop.mp4" },
+    "A+I": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
+    "A+J": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
+    "A+K": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
+    "A+L": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" }
+  },
   "movelists": {
     "ichigo": {
       "id": "ichigo",
@@ -1034,6 +1104,81 @@
         "defense": [
           { "name": "電氣屏障", "cmd": "A+I", "chi": 4, "effect": "防禦所有攻擊", "remarks": "" },
           { "name": "防守", "cmd": "A+J, A+K, A+L", "chi": 0, "effect": "分別防禦 J、K 與 L 攻擊", "remarks": "" }
+        ]
+      }
+    },
+    "skyrider": {
+      "id": "skyrider",
+      "en": {
+        "name": "Kamen Rider Skyrider",
+        "basic": [
+          { "name": "Punch", "cmd": "D+J", "chi": 0, "dmg": 55, "remarks": "Gain 2 CHI if hit" },
+          { "name": "Kick", "cmd": "D+K", "chi": 0, "dmg": 58, "remarks": "Gain 2 CHI if hit" },
+          { "name": "Sky Flying Saucer", "cmd": "D+L", "chi": 1, "dmg": 132, "remarks": "Require airborne, gain 3 CHI if hit" },
+          { "name": "Sky Chop", "cmd": "D+I", "chi": 1, "dmg": 120, "remarks": "Require airborne, gain 3 CHI if hit, build faint" }
+        ],
+        "special": [
+          { "name": "Sky Kick", "cmd": "S+J", "chi": 4, "dmg": 440, "remarks": "" },
+          { "name": "Sky Screw Kick", "cmd": "S+K", "chi": 5, "dmg": 550, "remarks": "Build faint" },
+          { "name": "Sky Drill", "cmd": "S+L", "chi": 7, "dmg": 890, "remarks": "Require airborne" },
+          { "name": "Three-Point Drop", "cmd": "S+I", "chi": 9, "dmg": 1220, "remarks": "Require airborne, build faint" }
+        ],
+        "utilities": [
+          { "name": "Sailing Jump", "cmd": "W+I", "chi": 3, "effect": "Buff attack and evasion", "remarks": "Last 5 rounds" },
+          { "name": "Gravity Reduction", "cmd": "W+J", "chi": 1, "effect": "Buff charge speed", "remarks": "Last 4 rounds" },
+          { "name": "Tornado Focus", "cmd": "W+K", "chi": 1, "effect": "Buff accuracy and special attack", "remarks": "Last 3 rounds" },
+          { "name": "Tornado Emission", "cmd": "W+L", "chi": 2, "effect": "Deal damage and build faint", "remarks": "Long reach" }
+        ],
+        "defense": [
+          { "name": "Standard Guard", "cmd": "A+I, A+J, A+K, A+L", "chi": 0, "effect": "Defense against I, J, K & L attacks respectively", "remarks": "" }
+        ]
+      },
+      "ja": {
+        "name": "スカイライダー",
+        "basic": [
+          { "name": "パンチ", "cmd": "D+J", "chi": 0, "dmg": 55, "remarks": "ヒット時、氣+2" },
+          { "name": "キック", "cmd": "D+K", "chi": 0, "dmg": 58, "remarks": "ヒット時、氣+2" },
+          { "name": "スカイフライングソーサー", "cmd": "D+L", "chi": 1, "dmg": 132, "remarks": "空中時のみ使用可能・ヒット時、氣+3" },
+          { "name": "スカイチョップ", "cmd": "D+I", "chi": 1, "dmg": 120, "remarks": "空中時のみ使用可能・ヒット時、氣+3・気絶値蓄積" }
+        ],
+        "special": [
+          { "name": "スカイキック", "cmd": "S+J", "chi": 4, "dmg": 440, "remarks": "" },
+          { "name": "スカイスクリューキック", "cmd": "S+K", "chi": 5, "dmg": 550, "remarks": "気絶値蓄積" },
+          { "name": "スカイドリル", "cmd": "S+L", "chi": 7, "dmg": 890, "remarks": "空中時のみ使用可能" },
+          { "name": "三点ドロップ", "cmd": "S+I", "chi": 9, "dmg": 1220, "remarks": "空中時のみ使用可能・気絶値蓄積" }
+        ],
+        "utilities": [
+          { "name": "セイリングジャンプ", "cmd": "W+I", "chi": 3, "effect": "攻撃力・回避率アップ", "remarks": "5ラウンド持続" },
+          { "name": "重力低減", "cmd": "W+J", "chi": 1, "effect": "チャージ速度アップ", "remarks": "4ラウンド持続" },
+          { "name": "トルネード集中", "cmd": "W+K", "chi": 1, "effect": "命中率・必殺技の威力アップ", "remarks": "3ラウンド持続" },
+          { "name": "トルネード発光", "cmd": "W+L", "chi": 2, "effect": "ダメージを与え気絶値を蓄積", "remarks": "遠距離リーチ" }
+        ],
+        "defense": [
+          { "name": "通常ガード", "cmd": "A+I, A+J, A+K, A+L", "chi": 0, "effect": "I・J・K・L攻撃をそれぞれ防御", "remarks": "" }
+        ]
+      },
+      "zh": {
+        "name": "假面騎士天空騎士",
+        "basic": [
+          { "name": "拳擊", "cmd": "D+J", "chi": 0, "dmg": 55, "remarks": "命中時氣+2" },
+          { "name": "踢腿", "cmd": "D+K", "chi": 0, "dmg": 58, "remarks": "命中時氣+2" },
+          { "name": "天空飛碟旋擊", "cmd": "D+L", "chi": 1, "dmg": 132, "remarks": "需處於空中狀態、命中時氣+3" },
+          { "name": "天空手刀", "cmd": "D+I", "chi": 1, "dmg": 120, "remarks": "需處於空中狀態、命中時氣+3、累積暈眩值" }
+        ],
+        "special": [
+          { "name": "天空踢", "cmd": "S+J", "chi": 4, "dmg": 440, "remarks": "" },
+          { "name": "天空螺旋踢", "cmd": "S+K", "chi": 5, "dmg": 550, "remarks": "累積暈眩值" },
+          { "name": "天空鑽擊", "cmd": "S+L", "chi": 7, "dmg": 890, "remarks": "需處於空中狀態" },
+          { "name": "三點式墜擊", "cmd": "S+I", "chi": 9, "dmg": 1220, "remarks": "需處於空中狀態、累積暈眩值" }
+        ],
+        "utilities": [
+          { "name": "滑翔跳躍", "cmd": "W+I", "chi": 3, "effect": "提升攻擊力與迴避率", "remarks": "持續5回合" },
+          { "name": "重力減低", "cmd": "W+J", "chi": 1, "effect": "提升蓄力速度", "remarks": "持續4回合" },
+          { "name": "龍捲風集中", "cmd": "W+K", "chi": 1, "effect": "提升命中率與必殺技威力", "remarks": "持續3回合" },
+          { "name": "龍捲風超光波", "cmd": "W+L", "chi": 2, "effect": "造成傷害並累積暈眩值", "remarks": "遠距離攻擊" }
+        ],
+        "defense": [
+          { "name": "防守", "cmd": "A+I, A+J, A+K, A+L", "chi": 0, "effect": "分別防禦 I、J、K 與 L 攻擊", "remarks": "" }
         ]
       }
     }
