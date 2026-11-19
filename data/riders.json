@@ -67,14 +67,25 @@
     "active": true
   },
   {
-  "id": "stronger",
-  "name": "Kamen Rider Stronger",
-  "sourceFacing": "right",
-  "maxLp": 3200,
-  "archetype": "Electro-Cyborg / High Voltage Burst",
-  "icon": "assets/images/icons/stronger.png",
-  "videoFolder": "assets/videos/stronger/",
-  "finisher": "Super Electron Drill Kick / Stronger Electro Kick",
-  "active": true
-   }
+    "id": "stronger",
+    "name": "Kamen Rider Stronger",
+    "sourceFacing": "right",
+    "maxLp": 3200,
+    "archetype": "Electro-Cyborg / High Voltage Burst",
+    "icon": "assets/images/icons/stronger.png",
+    "videoFolder": "assets/videos/stronger/",
+    "finisher": "Super Electron Drill Kick / Stronger Electro Kick",
+    "active": true
+  },
+  {
+    "id": "skyrider",
+    "name": "Kamen Rider Skyrider",
+    "sourceFacing": "right",
+    "maxLp": 2900,
+    "archetype": "Aerial Tempo / Gravity Control",
+    "icon": "assets/images/icons/skyrider.png",
+    "videoFolder": "assets/videos/skyrider/",
+    "finisher": "Three-Point Drop / Sky Kick",
+    "active": true
+  }
 ]
