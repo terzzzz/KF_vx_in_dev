@@ -1,7 +1,7 @@
 /* js/training_worker.js
 - Build: v5-state256-action17
-- Matrix: v8-8riders-9backup (64-Matchup Capacity)
-- Patch: charge1-reset1 (Turbo-Optimized Worker)
+- Matrix: v8-8riders-9backup (Sequential 1-Cell-at-a-Time Low-Memory Worker)
+- Patch: charge1-reset1
  */
 "use strict";
 
@@ -19,15 +19,13 @@ const MIXED_CPU_SEQUENCE = [
   "defensive",
   "master"
 ];
-const MIXED_ROUND_SPAN = 30;
 const MAX_WINS_PER_DIFF_OPP = 4;
+const MAX_REPLAY_ITEMS = 2048;
 
-// Turbo scheduling constants: keep worker on-CPU ~99.8% of the time
-// and avoid spamming main-thread DOM/localStorage serialization
-const YIELD_INTERVAL_MS = 500;
-const PROGRESS_INTERVAL_MS = 2000;
-const CHECKPOINT_GAME_INTERVAL = 250;
-const CHECKPOINT_MIN_INTERVAL_MS = 30000;
+const YIELD_INTERVAL_MS = 350;
+const PROGRESS_INTERVAL_MS = 1500;
+const CHECKPOINT_GAME_INTERVAL = 120;
+const CHECKPOINT_MIN_INTERVAL_MS = 15000;
 
 const MIXED_MODE_LABELS = {
   easy: "mixed:tree-hopper",
@@ -48,7 +46,7 @@ importScripts(...[
   "ai.js"
 ].map(file => file + "?v=" + CACHE_TAG));
 
-// Quantize JSON floats to 4 decimals (strips 17-digit float bloat: 851KB -> ~200KB per matrix)
+// Quantize JSON floats to 4 decimals (~200KB per matrix instead of ~850KB)
 function compactNetValue(val) {
   if (typeof val === "number") {
     return Number.isFinite(val) ? Math.round(val * 10000) / 10000 : 0;
@@ -73,7 +71,6 @@ if (typeof SoulNN !== "undefined" && SoulNN.Network?.prototype?.toJSON) {
   };
 }
 
-// Precompute stance/button lookup for all actions to avoid .split("+") in hot loop
 const ACTION_PARTS_CACHE = Object.create(null);
 if (typeof SoulEnv !== "undefined" && Array.isArray(SoulEnv.ACTION_MAP)) {
   for (const actKey of SoulEnv.ACTION_MAP) {
@@ -105,7 +102,6 @@ let resume = null;
 channel.port1.onmessage = () => {
   const callback = resume;
   resume = null;
-
   if (callback) callback();
 };
 
@@ -133,10 +129,7 @@ function assertRuntime() {
     typeof CombatCore.cpuReadyAtMs !== "function" ||
     typeof CombatCore.lastInputMs !== "function"
   ) {
-    throw new Error(
-      "Training worker loaded incompatible charging rules. " +
-      "Apply the charge1-reset1 core/environment patches."
-    );
+    throw new Error("Training worker loaded incompatible charging rules.");
   }
 
   if (
@@ -160,43 +153,24 @@ function validateJob(job) {
     job.schema !== EXPECTED_SCHEMA ||
     !["train", "evaluate"].includes(job.kind)
   ) {
-    throw new Error(
-      "Invalid job or mismatched training UI/worker patch."
-    );
+    throw new Error("Invalid job or mismatched training UI/worker patch.");
   }
 
-  if (
-    !job.data ||
-    !Array.isArray(job.data.riders) ||
-    !job.data.moves
-  ) {
+  if (!job.data || !Array.isArray(job.data.riders) || !job.data.moves) {
     throw new Error("Training job is missing combat data.");
   }
 
   SoulAgent.syncRosterCodes(job.data.riders);
 
-  if (
-    !Number.isInteger(job.matches) ||
-    job.matches < 2 ||
-    job.matches > 100000
-  ) {
+  if (!Number.isInteger(job.matches) || job.matches < 2 || job.matches > 100000) {
     throw new Error("Match count must be from 2 to 100000.");
   }
 
-  if (
-    job.kind === "evaluate" &&
-    job.matches % 2 !== 0
-  ) {
-    throw new Error(
-      "Evaluation count must be even for slot pairing."
-    );
+  if (job.kind === "evaluate" && job.matches % 2 !== 0) {
+    throw new Error("Evaluation count must be even for slot pairing.");
   }
 
-  if (
-    !Number.isSafeInteger(job.seed) ||
-    job.seed < 0 ||
-    job.seed > 4294967295
-  ) {
+  if (!Number.isSafeInteger(job.seed) || job.seed < 0 || job.seed > 4294967295) {
     throw new Error("Invalid job seed.");
   }
 
@@ -205,7 +179,7 @@ function validateJob(job) {
   }
 
   if (!job.learner || !job.opponent) {
-    throw new Error("Select a learner and opponent (or ALL OPPONENTS).");
+    throw new Error("Select a learner and opponent.");
   }
 
   const aliases = {
@@ -227,72 +201,19 @@ function validateJob(job) {
   job.mode = aliases[String(job.mode || "").toLowerCase()] || job.mode;
   job.teacher = aliases[String(job.teacher || "master").toLowerCase()] || job.teacher;
 
-  if (![
-    "mixed",
-    "easy",
-    "balanced",
-    "defensive",
-    "master",
-    "rider"
-  ].includes(job.mode)) {
+  if (!["mixed", "easy", "balanced", "defensive", "master", "rider"].includes(job.mode)) {
     throw new Error("Invalid opponent controller.");
-  }
-
-  if (Number.isFinite(job.guidePct)) {
-    if (job.guidePct < 0 || job.guidePct > 100) {
-      throw new Error("Guidance % must be from 0 to 100.");
-    }
-  } else if (
-    !Number.isFinite(job.guideHoldPct) ||
-    !Number.isFinite(job.guideZeroPct) ||
-    job.guideHoldPct < 0 ||
-    job.guideZeroPct > 100 ||
-    job.guideHoldPct > job.guideZeroPct
-  ) {
-    throw new Error("Invalid guidance schedule.");
-  }
-
-  if (
-    !Number.isInteger(job.initialEpsilon) ||
-    job.initialEpsilon < 1 ||
-    job.initialEpsilon > 100
-  ) {
-    throw new Error(
-      "Initial Epsilon must be an integer from 1 to 100."
-    );
-  }
-
-  if (typeof job.winOnly !== "boolean") {
-    throw new Error("winOnly must be a boolean.");
-  }
-
-  if (typeof job.warmStart !== "boolean") {
-    throw new Error("warmStart must be a boolean.");
-  }
-
-  if (!["network", "rider"].includes(job.learnerPolicy)) {
-    throw new Error("Invalid learner policy.");
-  }
-
-  if (!["easy", "balanced", "defensive", "master"].includes(job.teacher)) {
-    throw new Error("Invalid teacher difficulty.");
   }
 }
 
 function validateTransition(transition) {
   const index = transition?.a;
-
-  if (
-    !Number.isInteger(index) ||
-    index < 0 ||
-    index >= SoulEnv.ACTION_MAP.length
-  ) {
+  if (!Number.isInteger(index) || index < 0 || index >= SoulEnv.ACTION_MAP.length) {
     throw new Error("Episode returned an invalid action index.");
   }
 
   const key = SoulEnv.ACTION_MAP[index];
   const charge = transition.selectedCharge;
-
   const validCharge = key === "DO_NOTHING"
     ? charge === 0
     : Number.isFinite(charge) && charge >= 1 && charge <= 100;
@@ -308,10 +229,7 @@ function validateTransition(transition) {
     transition.resolvedCharge !== charge ||
     transition.coreAdjustedAction === true
   ) {
-    throw new Error(
-      "Episode action/charge mismatch. " +
-      "Refusing to record a mislabeled transition."
-    );
+    throw new Error("Episode action/charge mismatch.");
   }
 }
 
@@ -345,31 +263,29 @@ function updateMatchParameters(params, prevTotalGames, metrics, wasdCounts, jkil
 
   const stanceTotal = Math.max(
     1,
-    (wasdCounts.W || 0) +
-    (wasdCounts.A || 0) +
-    (wasdCounts.S || 0) +
-    (wasdCounts.D || 0) +
-    (wasdCounts.IDLE || 0)
+    (wasdCounts.W || 0) + (wasdCounts.A || 0) + (wasdCounts.S || 0) + (wasdCounts.D || 0) + (wasdCounts.IDLE || 0)
   );
   for (const k of ["W", "A", "S", "D", "IDLE"]) {
-    updated.stanceDistribution[k] =
-      Math.round(((wasdCounts[k] || 0) / stanceTotal) * 10000) / 10000;
+    updated.stanceDistribution[k] = Math.round(((wasdCounts[k] || 0) / stanceTotal) * 10000) / 10000;
   }
 
   const buttonTotal = Math.max(
     1,
-    (jkilCounts.J || 0) +
-    (jkilCounts.K || 0) +
-    (jkilCounts.I || 0) +
-    (jkilCounts.L || 0) +
-    (jkilCounts.NONE || 0)
+    (jkilCounts.J || 0) + (jkilCounts.K || 0) + (jkilCounts.I || 0) + (jkilCounts.L || 0) + (jkilCounts.NONE || 0)
   );
   for (const k of ["J", "K", "I", "L", "NONE"]) {
-    updated.buttonDistribution[k] =
-      Math.round(((jkilCounts[k] || 0) / buttonTotal) * 10000) / 10000;
+    updated.buttonDistribution[k] = Math.round(((jkilCounts[k] || 0) / buttonTotal) * 10000) / 10000;
   }
 
   return updated;
+}
+
+function acceptWithCap(learner, transition, imitation) {
+  learner.accept(transition, imitation);
+  const items = learner?.replay?.items;
+  if (Array.isArray(items) && items.length > MAX_REPLAY_ITEMS) {
+    items.splice(0, items.length - MAX_REPLAY_ITEMS);
+  }
 }
 
 async function run(job) {
@@ -381,10 +297,7 @@ async function run(job) {
   const hiddenSizes = spec.hidden.slice();
   const seed = job.seed >>> 0;
 
-  const learnerRider = data.riders.find(
-    rider => rider.id === job.learner
-  );
-
+  const learnerRider = data.riders.find(rider => rider.id === job.learner);
   if (!learnerRider) {
     throw new Error("Selected learner rider is absent from the dataset.");
   }
@@ -406,115 +319,26 @@ async function run(job) {
     );
   }
 
-  const riderDistillation =
-    training && job.learnerPolicy === "rider";
+  // Allocate matches per opponent cell so each cell runs sequentially and frees RAM immediately
+  const numOpps = targetOpponentRiders.length;
+  const perOppAllocations = targetOpponentRiders.map((oppRider, idx) => {
+    if (!training) {
+      const totalPairs = Math.floor(job.matches / 2);
+      const basePairs = Math.floor(totalPairs / numOpps);
+      const extraPair = idx < (totalPairs % numOpps) ? 1 : 0;
+      return { oppRider, count: (basePairs + extraPair) * 2 };
+    }
+    const base = Math.floor(job.matches / numOpps);
+    const extra = idx < (job.matches % numOpps) ? 1 : 0;
+    return { oppRider, count: base + extra };
+  }).filter(item => item.count > 0);
+
+  const totalPlannedMatches = perOppAllocations.reduce((s, x) => s + x.count, 0);
+
+  const riderDistillation = training && job.learnerPolicy === "rider";
   const riderImitationCoefficient = 0.02;
   const initialEpsilonBase = job.initialEpsilon / 100;
   const winOnly = job.winOnly;
-
-  // Build isolated per-matchup context so weights/replays NEVER pollute across opponents
-  const contexts = new Map();
-
-  for (const oppRider of targetOpponentRiders) {
-    const key = SoulAgent.getCanonicalKey(job.learner, oppRider.id);
-    const old = isMultiOpponent
-      ? (job.checkpointsByMatchup?.[key] || null)
-      : (job.checkpoint || job.checkpointsByMatchup?.[key] || null);
-
-    if (old) {
-      const validation = SoulAgent.validateCheckpoint(
-        old,
-        job.learner,
-        oppRider.id
-      );
-
-      if (!validation.valid) {
-        throw new Error(`Checkpoint ${key} rejected: ${validation.error}`);
-      }
-    }
-
-    if (!training && !old) {
-      throw new Error(`No checkpoint exists to evaluate for ${key}.`);
-    }
-
-    const net = old
-      ? SoulNN.Network.fromJSON(old.net)
-      : new SoulNN.Network(
-          spec.input,
-          ...spec.hidden,
-          spec.output
-        );
-
-    const revKey = SoulAgent.getCanonicalKey(oppRider.id, job.learner);
-    const revCheckpoint = isMultiOpponent
-      ? (job.opponentCheckpointsByMatchup?.[revKey] || null)
-      : (job.opponentCheckpoint || job.opponentCheckpointsByMatchup?.[revKey] || null);
-
-    let opponentNet = null;
-    if (revCheckpoint) {
-      const revValidation = SoulAgent.validateCheckpoint(
-        revCheckpoint,
-        oppRider.id,
-        job.learner
-      );
-      if (!revValidation.valid) {
-        throw new Error(`Reverse checkpoint ${revKey} rejected: ${revValidation.error}`);
-      }
-      opponentNet = SoulNN.Network.fromJSON(revCheckpoint.net);
-    }
-
-    const baseGames = old?.games || 0;
-    const baseSteps = old?.steps || 0;
-
-    // Turbo Learner config: reduce backprop frequency from every 2-4 steps to every 8-12 steps
-    // and use a compact minibatch so CPU isn't bottlenecked by 160+ backprop passes per match
-    const learner = training
-      ? new SoulNN.Learner(
-          net,
-          KF.hash(seed, "replay", key),
-          baseSteps,
-          job.warmStart
-            ? { interval: 8, warmup: 64, batchSize: 16 }
-            : { interval: 12, warmup: 160, batchSize: 16 }
-        )
-      : null;
-
-    const weightsID = old ? SoulAgent.fingerprint(old) : null;
-    const loadedWeightsID = !training
-      ? String(KF.hash(JSON.stringify(net.toJSON())))
-      : weightsID;
-
-    if (!training && String(weightsID) !== loadedWeightsID) {
-      throw new Error(
-        `Loaded evaluation weights differ from checkpoint for ${key}.`
-      );
-    }
-
-    contexts.set(oppRider.id, {
-      key,
-      opponentRider: oppRider,
-      old,
-      net,
-      opponentNet,
-      learner,
-      baseGames,
-      baseSteps,
-      weightsID,
-      loadedWeightsID,
-      games: 0,
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      rounds: 0,
-      transitions: 0,
-      qSum: 0,
-      qCount: 0,
-      recent: [],
-      wasdCounts: { W: 0, A: 0, S: 0, D: 0, IDLE: 0 },
-      jkilCounts: { J: 0, K: 0, I: 0, L: 0, NONE: 0 },
-      matchParameters: SoulAgent.createDefaultMatchParameters(old?.matchParameters)
-    });
-  }
 
   const started = performance.now();
   let lastProgress = started;
@@ -529,6 +353,9 @@ async function run(job) {
   let transitions = 0;
   let qSum = 0;
   let qCount = 0;
+  let totalUpdates = 0;
+  let latestLoss = 0;
+  const aggUpdateStats = { win: 0, damage: 0, loss: 0, neutral: 0 };
 
   let guideProbability = 0;
   let imitation = 0;
@@ -538,71 +365,13 @@ async function run(job) {
   const firstWinningGames = [];
   let lastReportedWinsCount = 0;
   const winCountsByDiffOpp = {};
+  const matchupReports = [];
 
-  const wasdCounts = {
-    W: 0,
-    A: 0,
-    S: 0,
-    D: 0,
-    IDLE: 0
-  };
-
-  const jkilCounts = {
-    J: 0,
-    K: 0,
-    I: 0,
-    L: 0,
-    NONE: 0
-  };
-
+  const wasdCounts = { W: 0, A: 0, S: 0, D: 0, IDLE: 0 };
+  const jkilCounts = { J: 0, K: 0, I: 0, L: 0, NONE: 0 };
   const moveMatrix = Object.fromEntries(
-    Object.keys(wasdCounts).map(stance => [
-      stance,
-      { J: 0, K: 0, I: 0, L: 0, NONE: 0 }
-    ])
+    Object.keys(wasdCounts).map(stance => [stance, { J: 0, K: 0, I: 0, L: 0, NONE: 0 }])
   );
-
-  function buildCheckpointForContext(ctx) {
-    return {
-      version: VERSION,
-      trainerBuild: BUILD,
-      trainerPatch: PATCH,
-      spec,
-      net: ctx.net.toJSON(),
-
-      canonicalKey: ctx.key,
-      learnerId: job.learner,
-      opponentId: ctx.opponentRider.id,
-
-      games: ctx.baseGames + ctx.games,
-      steps: ctx.learner ? ctx.learner.steps : ctx.baseSteps,
-
-      savedAt: new Date().toISOString(),
-      seed,
-      rewardMode: job.rewardMode,
-
-      evaluation: null,
-      evaluated: false,
-
-      matchParameters: SoulAgent.createDefaultMatchParameters(ctx.matchParameters),
-
-      trainingTask: {
-        opponentController: job.mode,
-        warmStart: job.warmStart,
-        initialEpsilon: job.initialEpsilon,
-        winOnly,
-        learnerPolicy: job.learnerPolicy,
-        riderDistillation,
-        riderImitationCoefficient: riderDistillation
-          ? riderImitationCoefficient
-          : 0
-      }
-    };
-  }
-
-  const singleCtx = !isMultiOpponent
-    ? contexts.get(targetOpponentRiders[0].id)
-    : null;
 
   const modeDisplayNames = {
     easy: "Tree-hopper (easy)",
@@ -613,26 +382,433 @@ async function run(job) {
   };
 
   const effectiveOpponent = job.mode === "rider"
-    ? isMultiOpponent
-      ? "Rider with per-matchup reverse active checkpoints (Bullet Ant fallback)"
-      : singleCtx?.opponentNet
-        ? "Rider with reverse-matchup active checkpoint"
-        : "Bullet Ant fallback; reverse-matchup checkpoint unavailable"
+    ? "Rider (reverse active matchup checkpoint)"
     : job.mode === "mixed"
-      ? "MIXED cycle (30 Tree-hopper -> 30 Cricket -> 30 Beetle -> 30 Bullet Ant)"
+      ? "MIXED cycle (Tree-hopper -> Cricket -> Beetle -> Bullet Ant)"
       : modeDisplayNames[job.mode] || job.mode;
 
-  function buildMatchupEvaluationReports(seconds) {
-    if (training) return null;
+  const fastTeachers = ["balanced", "defensive", "balanced", "master"];
 
-    const perOpponentRequested = Math.floor(job.matches / targetOpponentRiders.length);
-    const reports = [];
+  // Train/Evaluate ONE opponent cell at a time and release its memory before the next cell
+  for (let cellIdx = 0; cellIdx < perOppAllocations.length && !cancelled; cellIdx++) {
+    const { oppRider, count: cellMatches } = perOppAllocations[cellIdx];
+    const key = SoulAgent.getCanonicalKey(job.learner, oppRider.id);
 
-    for (const oppRider of targetOpponentRiders) {
-      const ctx = contexts.get(oppRider.id);
-      if (!ctx || ctx.games < 2 || ctx.games % 2 !== 0) continue;
+    const old = isMultiOpponent
+      ? (job.checkpointsByMatchup?.[key] || null)
+      : (job.checkpoint || job.checkpointsByMatchup?.[key] || null);
 
-      reports.push({
+    if (old) {
+      const validation = SoulAgent.validateCheckpoint(old, job.learner, oppRider.id);
+      if (!validation.valid) {
+        throw new Error(`Checkpoint ${key} rejected: ${validation.error}`);
+      }
+    }
+
+    if (!training && !old) {
+      throw new Error(`No checkpoint exists to evaluate for ${key}.`);
+    }
+
+    let net = old
+      ? SoulNN.Network.fromJSON(old.net)
+      : new SoulNN.Network(spec.input, ...spec.hidden, spec.output);
+
+    const revKey = SoulAgent.getCanonicalKey(oppRider.id, job.learner);
+    const revCheckpoint = isMultiOpponent
+      ? (job.opponentCheckpointsByMatchup?.[revKey] || null)
+      : (job.opponentCheckpoint || job.opponentCheckpointsByMatchup?.[revKey] || null);
+
+    let opponentNet = null;
+    if (revCheckpoint) {
+      const revValidation = SoulAgent.validateCheckpoint(revCheckpoint, oppRider.id, job.learner);
+      if (!revValidation.valid) {
+        throw new Error(`Reverse checkpoint ${revKey} rejected: ${revValidation.error}`);
+      }
+      opponentNet = SoulNN.Network.fromJSON(revCheckpoint.net);
+    }
+
+    const baseGames = old?.games || 0;
+    const baseSteps = old?.steps || 0;
+
+    let learner = training
+      ? new SoulNN.Learner(
+          net,
+          KF.hash(seed, "replay", key),
+          baseSteps,
+          job.warmStart
+            ? { interval: 8, warmup: 64, batchSize: 16, capacity: MAX_REPLAY_ITEMS, maxSize: MAX_REPLAY_ITEMS }
+            : { interval: 12, warmup: 160, batchSize: 16, capacity: MAX_REPLAY_ITEMS, maxSize: MAX_REPLAY_ITEMS }
+        )
+      : null;
+
+    const weightsID = old ? SoulAgent.fingerprint(old) : null;
+    const loadedWeightsID = !training
+      ? String(KF.hash(JSON.stringify(net.toJSON())))
+      : weightsID;
+
+    let cellGames = 0;
+    let cellWins = 0;
+    let cellLosses = 0;
+    let cellDraws = 0;
+    let cellRounds = 0;
+    const cellRecent = [];
+    const cellWasd = { W: 0, A: 0, S: 0, D: 0, IDLE: 0 };
+    const cellJkil = { J: 0, K: 0, I: 0, L: 0, NONE: 0 };
+    let cellParams = SoulAgent.createDefaultMatchParameters(old?.matchParameters);
+
+    const buildCellCheckpoint = () => ({
+      version: VERSION,
+      trainerBuild: BUILD,
+      trainerPatch: PATCH,
+      spec,
+      net: net.toJSON(),
+      canonicalKey: key,
+      learnerId: job.learner,
+      opponentId: oppRider.id,
+      games: baseGames + cellGames,
+      steps: learner ? learner.steps : baseSteps,
+      savedAt: new Date().toISOString(),
+      seed,
+      rewardMode: job.rewardMode,
+      evaluation: null,
+      evaluated: false,
+      matchParameters: SoulAgent.createDefaultMatchParameters(cellParams),
+      trainingTask: {
+        opponentController: job.mode,
+        warmStart: job.warmStart,
+        initialEpsilon: job.initialEpsilon,
+        winOnly,
+        learnerPolicy: job.learnerPolicy,
+        riderDistillation,
+        riderImitationCoefficient: riderDistillation ? riderImitationCoefficient : 0
+      }
+    });
+
+    const buildProgressReport = (forceFullLogs = false) => {
+      const seconds = Math.max(0.001, (performance.now() - started) / 1000);
+      const includeWinLogs = forceFullLogs || firstWinningGames.length !== lastReportedWinsCount;
+      if (includeWinLogs) lastReportedWinsCount = firstWinningGames.length;
+
+      return {
+        build: BUILD,
+        patch: PATCH,
+        schema: EXPECTED_SCHEMA,
+        kind: job.kind,
+        target: job.target || "candidate",
+        games,
+        requested: totalPlannedMatches,
+        wins,
+        losses,
+        draws,
+        winRate: games ? (100 * wins) / games : 0,
+        averageRounds: games ? rounds / games : 0,
+        seconds,
+        matchesPerMinute: (60 * games) / seconds,
+        decisionsPerSecond: transitions / seconds,
+        transitions,
+        loss: learner?.loss || latestLoss || 0,
+        replaySize: learner?.replay?.items?.length || 0,
+        updates: totalUpdates + (learner?.updates || 0),
+        updateStats: training ? aggUpdateStats : null,
+        avgQ: qCount ? qSum / qCount : 0,
+        totalTrainingGames: baseGames + (training ? cellGames : 0),
+        weightsID: !isMultiOpponent ? weightsID : key,
+        loadedWeightsID: !isMultiOpponent ? loadedWeightsID : key,
+        teacher: training ? job.teacher : null,
+        guidePct: Number.isFinite(job.guidePct) ? job.guidePct : null,
+        guideProbability,
+        imitationCoefficient: imitation,
+        epsilon,
+        initialEpsilon: job.initialEpsilon,
+        winOnly,
+        rewardMode: job.rewardMode,
+        seed,
+        learner: job.learner,
+        opponent: isMultiOpponent
+          ? `ROW (${cellIdx + 1}/${perOppAllocations.length}: ${key})`
+          : job.opponent,
+        activeOpponentId: oppRider.id,
+        learnerPolicy: job.learnerPolicy,
+        riderDistillation,
+        riderImitationCoefficient: riderDistillation ? riderImitationCoefficient : 0,
+        mode: job.mode,
+        effectiveOpponent,
+        warmStart: job.warmStart,
+        hiddenSizes,
+        cancelled,
+        matchParameters: cellParams,
+        matchupReports: forceFullLogs ? matchupReports : null,
+        breakdown,
+        firstWinningGames: includeWinLogs ? firstWinningGames : null,
+        firstWinningGamesCount: firstWinningGames.length,
+        wasdRatio: { counts: { ...wasdCounts } },
+        moveBreakdown: { jkilCounts: { ...jkilCounts }, moveMatrix }
+      };
+    };
+
+    const span = Math.max(1, Math.min(30, Math.floor(cellMatches / MIXED_CPU_SEQUENCE.length) || 1));
+    const fullCycleLen = span * MIXED_CPU_SEQUENCE.length;
+
+    for (let i = 0; i < cellMatches && !cancelled; i++) {
+      const mixedCycleIndex = training && job.mode === "mixed"
+        ? Math.floor(i / fullCycleLen)
+        : 0;
+
+      const learnerSlot = (i + mixedCycleIndex) % 2 === 0 ? "p1" : "p2";
+
+      const matchOpponentMode = job.mode === "mixed"
+        ? MIXED_CPU_SEQUENCE[Math.floor(i / span) % MIXED_CPU_SEQUENCE.length]
+        : job.mode;
+
+      const bucketKey = `${key}|${matchOpponentMode}`;
+      const needDemoMoves = (winCountsByDiffOpp[bucketKey] || 0) < MAX_WINS_PER_DIFF_OPP;
+
+      const cellPair = Math.floor(cellGames / 2);
+      const matchSeed = KF.hash(
+        seed,
+        key,
+        training ? "training" : "evaluation",
+        training ? baseGames + cellPair : cellPair
+      );
+
+      const cellProgress = (100 * i) / cellMatches;
+      guideProbability = 0;
+      epsilon = 0;
+      imitation = 0;
+
+      let matchGuideProbability = 0;
+      let effectiveTeacher = "easy";
+
+      if (training) {
+        if (job.warmStart) {
+          guideProbability = 1;
+          matchGuideProbability = 1;
+          imitation = 1;
+          effectiveTeacher = job.teacher === "master"
+            ? fastTeachers[i % fastTeachers.length]
+            : job.teacher;
+          epsilon = Math.max(0.02, initialEpsilonBase * (1 - (cellProgress / 100) * 0.8));
+        } else {
+          if (Number.isFinite(job.guidePct)) {
+            const totalCtxExp = baseGames + cellGames;
+            const expDecay = totalCtxExp > 60 ? Math.max(0.25, 60 / totalCtxExp) : 1.0;
+            const batchDecay = 1 - (cellProgress / 100) * 0.5;
+            guideProbability = (job.guidePct / 100) * expDecay * batchDecay;
+          }
+
+          const rollingWinRate = cellRecent.length
+            ? cellRecent.reduce((sum, value) => sum + value, 0) / cellRecent.length
+            : 0.2;
+
+          const targetFloor = Math.max(0.01, initialEpsilonBase * 0.1);
+          const adaptiveRatio = Math.max(0.2, 1 + (0.5 - rollingWinRate) / 0.3);
+
+          epsilon = Math.max(
+            targetFloor,
+            Math.min(
+              initialEpsilonBase,
+              initialEpsilonBase * (1 - (cellProgress / 100) * 0.7) * adaptiveRatio
+            )
+          );
+
+          const guideRoll = (KF.hash(matchSeed, "guide_gate", i) >>> 0) / 4294967296;
+          const guidedMatch = guideProbability >= 1 || (guideProbability > 0 && guideRoll < guideProbability);
+          matchGuideProbability = guidedMatch ? 1 : 0;
+
+          if (guidedMatch) {
+            effectiveTeacher = job.teacher === "master"
+              ? fastTeachers[i % fastTeachers.length]
+              : job.teacher;
+          }
+
+          const masterImitation = guidedMatch ? Math.max(0.01, 0.05 * guideProbability) : 0;
+          imitation = Math.max(masterImitation, riderDistillation ? riderImitationCoefficient : 0);
+        }
+      }
+
+      let matchTransitions = winOnly ? [] : null;
+      let matchRoundMoves = needDemoMoves ? [] : null;
+
+      const generator = SoulSim.episode({
+        data,
+        spec,
+        net,
+        learnerSlot,
+        learnerId: job.learner,
+        opponent: oppRider,
+        opponentMode: matchOpponentMode,
+        opponentNet,
+        seed: matchSeed,
+        epsilon,
+        guideProbability: matchGuideProbability,
+        teacher: effectiveTeacher,
+        rewardMode: job.rewardMode,
+        learnerMode: job.learnerPolicy,
+        distillRider: riderDistillation,
+        isEvaluation: !training
+      });
+
+      let result = null;
+
+      for (const event of generator) {
+        if (cancelled) break;
+
+        if (event.type === "transition") {
+          validateTransition(event.transition);
+          transitions++;
+
+          if (training) {
+            if (winOnly) {
+              matchTransitions.push({ transition: event.transition, imitation });
+            } else {
+              acceptWithCap(learner, event.transition, imitation);
+            }
+          }
+
+          const actKey = event.transition.resolvedActionKey;
+          const learnerCharge = event.transition.resolvedCharge;
+          const { stance, button } = getActionParts(actKey);
+
+          wasdCounts[stance]++;
+          jkilCounts[button]++;
+          moveMatrix[stance][button]++;
+          cellWasd[stance]++;
+          cellJkil[button]++;
+
+          if (needDemoMoves && matchRoundMoves.length < 120) {
+            matchRoundMoves.push({
+              round: matchRoundMoves.length + 1,
+              learnerMove: actKey,
+              learnerCharge,
+              learnerLp: event.transition.learnerLp,
+              learnerChi: event.transition.learnerChi,
+              learnerFaint: event.transition.learnerFaint,
+              oppMove: event.transition.opponentActionKey,
+              oppCharge: event.transition.opponentCharge,
+              oppLp: event.transition.oppLp,
+              oppChi: event.transition.oppChi,
+              oppFaint: event.transition.oppFaint
+            });
+          }
+        } else if (event.type === "round") {
+          if (Number.isFinite(event.qSumDelta) && event.qCountDelta > 0) {
+            qSum += event.qSumDelta;
+            qCount += event.qCountDelta;
+          }
+        } else if (event.type === "end") {
+          result = event.result;
+        }
+      }
+
+      if (!result || cancelled) {
+        matchTransitions = null;
+        matchRoundMoves = null;
+        break;
+      }
+
+      const prevTotalCellGames = baseGames + cellGames;
+      games++;
+      rounds += result.rounds;
+      cellGames++;
+      cellRounds += result.rounds;
+
+      cellParams = updateMatchParameters(
+        cellParams,
+        prevTotalCellGames,
+        result.matchMetrics,
+        cellWasd,
+        cellJkil
+      );
+
+      let outcome;
+      if (result.state.winner === learnerSlot) {
+        wins++;
+        cellWins++;
+        outcome = "wins";
+
+        const currentBucketWins = winCountsByDiffOpp[bucketKey] || 0;
+        if (currentBucketWins < MAX_WINS_PER_DIFF_OPP && matchRoundMoves) {
+          winCountsByDiffOpp[bucketKey] = currentBucketWins + 1;
+          firstWinningGames.push({
+            gameNumber: games,
+            matchupKey: key,
+            opponentId: oppRider.id,
+            opponentName: oppRider.name || oppRider.id,
+            difficulty: matchOpponentMode,
+            difficultyLabel: modeDisplayNames[matchOpponentMode] || matchOpponentMode,
+            learnerSlot,
+            bucketWinIndex: currentBucketWins + 1,
+            bucketMaxWins: MAX_WINS_PER_DIFF_OPP,
+            totalRounds: result.rounds,
+            moves: matchRoundMoves
+          });
+        }
+
+        if (training && winOnly && matchTransitions) {
+          for (const item of matchTransitions) {
+            acceptWithCap(learner, item.transition, item.imitation);
+          }
+        }
+      } else if (result.state.winner === "draw") {
+        draws++;
+        cellDraws++;
+        outcome = "draws";
+      } else if (result.state.winner) {
+        losses++;
+        cellLosses++;
+        outcome = "losses";
+      } else {
+        throw new Error("Episode ended without a winner or draw.");
+      }
+
+      matchTransitions = null;
+      matchRoundMoves = null;
+
+      cellRecent.push(outcome === "wins" ? 1 : 0);
+      if (cellRecent.length > 30) cellRecent.shift();
+
+      const matchOpponentLabel = job.mode === "mixed"
+        ? (MIXED_MODE_LABELS[matchOpponentMode] || `mixed:${matchOpponentMode}`)
+        : matchOpponentMode;
+
+      const label = `${key} (${oppRider.id}) / ${matchOpponentLabel} / ${learnerSlot}`;
+      let row = breakdown[label];
+      if (!row) {
+        row = { games: 0, wins: 0, losses: 0, draws: 0 };
+        breakdown[label] = row;
+      }
+      row.games++;
+      row[outcome]++;
+
+      const now = performance.now();
+
+      if (
+        training &&
+        cellGames % CHECKPOINT_GAME_INTERVAL === 0 &&
+        now - lastCheckpointSent >= CHECKPOINT_MIN_INTERVAL_MS
+      ) {
+        send("checkpoint", { checkpoint: buildCellCheckpoint() });
+        lastCheckpointSent = performance.now();
+      }
+
+      if (now - lastProgress >= PROGRESS_INTERVAL_MS) {
+        send("progress", { report: buildProgressReport(false) });
+        lastProgress = performance.now();
+      }
+
+      if (now - lastYield >= YIELD_INTERVAL_MS) {
+        await pause();
+        lastYield = performance.now();
+      }
+    }
+
+    if (training && cellGames > 0) {
+      send("checkpoint", { checkpoint: buildCellCheckpoint() });
+    }
+
+    if (!training && cellGames >= 2 && cellGames % 2 === 0) {
+      const seconds = Math.max(0.001, (performance.now() - started) / 1000);
+      matchupReports.push({
         build: BUILD,
         patch: PATCH,
         schema: EXPECTED_SCHEMA,
@@ -641,489 +817,99 @@ async function run(job) {
         learner: job.learner,
         opponent: oppRider.id,
         learnerPolicy: job.learnerPolicy,
-        games: ctx.games,
-        requested: isMultiOpponent ? ctx.games : job.matches,
-        perOpponentRequested,
-        wins: ctx.wins,
-        losses: ctx.losses,
-        draws: ctx.draws,
-        winRate: ctx.games ? (100 * ctx.wins) / ctx.games : 0,
-        averageRounds: ctx.games ? ctx.rounds / ctx.games : 0,
+        games: cellGames,
+        requested: cellMatches,
+        wins: cellWins,
+        losses: cellLosses,
+        draws: cellDraws,
+        winRate: cellGames ? (100 * cellWins) / cellGames : 0,
+        averageRounds: cellGames ? cellRounds / cellGames : 0,
         seconds,
-        weightsID: ctx.weightsID,
-        loadedWeightsID: ctx.loadedWeightsID,
+        weightsID,
+        loadedWeightsID,
         cancelled
       });
     }
 
-    return reports;
-  }
-
-  function report(activeCtx = singleCtx, forceFullLogs = false) {
-    const seconds = Math.max(
-      0.001,
-      (performance.now() - started) / 1000
-    );
-
-    const ctx = activeCtx || contexts.values().next().value;
-
-    let totalReplaySize = 0;
-    let totalUpdates = 0;
-    let latestLoss = 0;
-    const aggUpdateStats = { win: 0, damage: 0, loss: 0, neutral: 0 };
-
-    for (const c of contexts.values()) {
-      if (c.learner) {
-        totalReplaySize += c.learner.replay.items.length || 0;
-        totalUpdates += c.learner.updates || 0;
-        if (c.learner.loss) latestLoss = c.learner.loss;
-        if (c.learner.updateStats) {
-          aggUpdateStats.win += c.learner.updateStats.win || 0;
-          aggUpdateStats.damage += c.learner.updateStats.damage || 0;
-          aggUpdateStats.loss += c.learner.updateStats.loss || 0;
-          aggUpdateStats.neutral += c.learner.updateStats.neutral || 0;
-        }
+    if (learner) {
+      totalUpdates += learner.updates || 0;
+      if (learner.loss) latestLoss = learner.loss;
+      if (learner.updateStats) {
+        aggUpdateStats.win += learner.updateStats.win || 0;
+        aggUpdateStats.damage += learner.updateStats.damage || 0;
+        aggUpdateStats.loss += learner.updateStats.loss || 0;
+        aggUpdateStats.neutral += learner.updateStats.neutral || 0;
+      }
+      if (learner.replay?.items) {
+        learner.replay.items.length = 0;
       }
     }
 
-    // Only structured-clone the heavy firstWinningGames array when a new demo win was added or at job end
-    const includeWinLogs =
-      forceFullLogs || firstWinningGames.length !== lastReportedWinsCount;
-    if (includeWinLogs) {
-      lastReportedWinsCount = firstWinningGames.length;
-    }
+    // Explicitly release cell network & learner memory before moving to the next cell in the row
+    learner = null;
+    net = null;
+    opponentNet = null;
+  }
 
-    return {
+  const finalSeconds = Math.max(0.001, (performance.now() - started) / 1000);
+  if (firstWinningGames.length !== lastReportedWinsCount) {
+    lastReportedWinsCount = firstWinningGames.length;
+  }
+
+  send("done", {
+    report: {
       build: BUILD,
       patch: PATCH,
       schema: EXPECTED_SCHEMA,
       kind: job.kind,
       target: job.target || "candidate",
-
       games,
-      requested: job.matches,
+      requested: totalPlannedMatches,
       wins,
       losses,
       draws,
-
       winRate: games ? (100 * wins) / games : 0,
       averageRounds: games ? rounds / games : 0,
-      seconds,
-
-      matchesPerMinute: (60 * games) / seconds,
-      decisionsPerSecond: transitions / seconds,
+      seconds: finalSeconds,
+      matchesPerMinute: (60 * games) / finalSeconds,
+      decisionsPerSecond: transitions / finalSeconds,
       transitions,
-
-      loss: ctx?.learner?.loss || latestLoss || 0,
-      replaySize: totalReplaySize,
+      loss: latestLoss,
+      replaySize: 0,
       updates: totalUpdates,
       updateStats: training ? aggUpdateStats : null,
-
       avgQ: qCount ? qSum / qCount : 0,
-      totalTrainingGames: (ctx?.baseGames || 0) + (training ? games : 0),
-
-      weightsID: singleCtx ? singleCtx.weightsID : "MULTI-MATCHUP-MATRIX",
-      loadedWeightsID: singleCtx ? singleCtx.loadedWeightsID : "MULTI-MATCHUP-MATRIX",
-
+      totalTrainingGames: games,
+      weightsID: "ROW-SEQUENTIAL",
+      loadedWeightsID: "ROW-SEQUENTIAL",
       teacher: training ? job.teacher : null,
-      guidePct: Number.isFinite(job.guidePct)
-        ? job.guidePct
-        : null,
+      guidePct: Number.isFinite(job.guidePct) ? job.guidePct : null,
       guideProbability,
       imitationCoefficient: imitation,
       epsilon,
       initialEpsilon: job.initialEpsilon,
-
       winOnly,
       rewardMode: job.rewardMode,
       seed,
-
       learner: job.learner,
-      opponent: isMultiOpponent
-        ? `ALL (${targetOpponentRiders.length} Riders Auto-Cycle)`
-        : job.opponent,
-      activeOpponentId: ctx?.opponentRider?.id || job.opponent,
+      opponent: isMultiOpponent ? `ALL OPPONENTS IN ROW (${perOppAllocations.length} cells)` : job.opponent,
       learnerPolicy: job.learnerPolicy,
-
       riderDistillation,
-      riderImitationCoefficient: riderDistillation
-        ? riderImitationCoefficient
-        : 0,
-
+      riderImitationCoefficient: riderDistillation ? riderImitationCoefficient : 0,
       mode: job.mode,
       effectiveOpponent,
       warmStart: job.warmStart,
       hiddenSizes,
       cancelled,
-
-      matchParameters: ctx?.matchParameters || null,
-      matchupReports: forceFullLogs ? buildMatchupEvaluationReports(seconds) : null,
-
+      matchParameters: null,
+      matchupReports,
       breakdown,
-      firstWinningGames: includeWinLogs ? firstWinningGames : null,
+      firstWinningGames,
       firstWinningGamesCount: firstWinningGames.length,
-
-      wasdRatio: {
-        counts: { ...wasdCounts }
-      },
-
-      moveBreakdown: {
-        jkilCounts: { ...jkilCounts },
-        moveMatrix
-      }
-    };
-  }
-
-  const fullMixedCycleLength =
-    MIXED_ROUND_SPAN * MIXED_CPU_SEQUENCE.length;
-
-  const fastTeachers = ["balanced", "defensive", "balanced", "master"];
-
-  for (let i = 0; i < job.matches && !cancelled; i++) {
-    const pairIndex = Math.floor(i / 2);
-    const oppRider =
-      targetOpponentRiders[pairIndex % targetOpponentRiders.length];
-    const ctx = contexts.get(oppRider.id);
-
-    const mixedCycleIndex =
-      training && job.mode === "mixed"
-        ? Math.floor(i / fullMixedCycleLength)
-        : 0;
-
-    const learnerSlot =
-      (i + mixedCycleIndex) % 2 === 0 ? "p1" : "p2";
-
-    const matchOpponentMode = job.mode === "mixed"
-      ? MIXED_CPU_SEQUENCE[
-          Math.floor(i / MIXED_ROUND_SPAN) %
-          MIXED_CPU_SEQUENCE.length
-        ]
-      : job.mode;
-
-    const bucketKey = `${ctx.key}|${matchOpponentMode}`;
-    const needDemoMoves =
-      (winCountsByDiffOpp[bucketKey] || 0) < MAX_WINS_PER_DIFF_OPP;
-
-    const ctxPair = Math.floor(ctx.games / 2);
-    const matchSeed = KF.hash(
-      seed,
-      ctx.key,
-      training ? "training" : "evaluation",
-      training ? ctx.baseGames + ctxPair : ctxPair
-    );
-
-    const progress = (100 * i) / job.matches;
-
-    guideProbability = 0;
-    epsilon = 0;
-    imitation = 0;
-
-    let matchGuideProbability = 0;
-    let effectiveTeacher = "easy";
-
-    if (training) {
-      if (job.warmStart) {
-        guideProbability = 1;
-        matchGuideProbability = 1;
-        imitation = 1;
-        // Use fast tactical teachers on 75% of warm-start games so warm-start finishes rapidly
-        effectiveTeacher =
-          job.teacher === "master"
-            ? fastTeachers[i % fastTeachers.length]
-            : job.teacher;
-
-        epsilon = Math.max(
-          0.02,
-          initialEpsilonBase * (1 - (progress / 100) * 0.8)
-        );
-      } else {
-        if (Number.isFinite(job.guidePct)) {
-          // Decay guidance smoothly as this specific matchup accumulates experience
-          const totalCtxExp = ctx.baseGames + ctx.games;
-          const expDecay = totalCtxExp > 60
-            ? Math.max(0.25, 60 / totalCtxExp)
-            : 1.0;
-          const batchDecay = 1 - (progress / 100) * 0.5;
-          guideProbability = (job.guidePct / 100) * expDecay * batchDecay;
-        } else if (progress < job.guideHoldPct) {
-          guideProbability = 1;
-        } else if (
-          progress < job.guideZeroPct &&
-          job.guideZeroPct > job.guideHoldPct
-        ) {
-          guideProbability =
-            1 -
-            (progress - job.guideHoldPct) /
-            (job.guideZeroPct - job.guideHoldPct);
-        }
-
-        const rollingWinRate = ctx.recent.length
-          ? ctx.recent.reduce((sum, value) => sum + value, 0) /
-            ctx.recent.length
-          : 0.2;
-
-        const targetFloor = Math.max(
-          0.01,
-          initialEpsilonBase * 0.1
-        );
-
-        const adaptiveRatio = Math.max(
-          0.2,
-          1 + (0.5 - rollingWinRate) / 0.3
-        );
-
-        epsilon = Math.max(
-          targetFloor,
-          Math.min(
-            initialEpsilonBase,
-            initialEpsilonBase *
-            (1 - (progress / 100) * 0.7) *
-            adaptiveRatio
-          )
-        );
-
-        // Deterministic per-match roll so low guideProbability skips heavy teacher lookahead
-        // on unguided matches instead of running teacher evaluation on 100% of matches
-        const guideRoll = (KF.hash(matchSeed, "guide_gate", i) >>> 0) / 4294967296;
-        const guidedMatch =
-          guideProbability >= 1 ||
-          (guideProbability > 0 && guideRoll < guideProbability);
-
-        matchGuideProbability = guidedMatch ? 1 : 0;
-
-        if (guidedMatch) {
-          effectiveTeacher =
-            job.teacher === "master"
-              ? fastTeachers[i % fastTeachers.length]
-              : job.teacher;
-        } else {
-          effectiveTeacher = "easy";
-        }
-
-        const masterImitation = guidedMatch
-          ? Math.max(0.01, 0.05 * guideProbability)
-          : 0;
-
-        imitation = Math.max(
-          masterImitation,
-          riderDistillation ? riderImitationCoefficient : 0
-        );
-      }
+      wasdRatio: { counts: { ...wasdCounts } },
+      moveBreakdown: { jkilCounts: { ...jkilCounts }, moveMatrix }
     }
-
-    const matchTransitions = [];
-    const matchRoundMoves = needDemoMoves ? [] : null;
-
-    const generator = SoulSim.episode({
-      data,
-      spec,
-      net: ctx.net,
-
-      learnerSlot,
-      learnerId: job.learner,
-      opponent: ctx.opponentRider,
-
-      opponentMode: matchOpponentMode,
-      opponentNet: ctx.opponentNet,
-
-      seed: matchSeed,
-      epsilon,
-      guideProbability: matchGuideProbability,
-      teacher: effectiveTeacher,
-      rewardMode: job.rewardMode,
-
-      learnerMode: job.learnerPolicy,
-      distillRider: riderDistillation,
-      isEvaluation: !training
-    });
-
-    let result = null;
-
-    for (const event of generator) {
-      if (cancelled) break;
-
-      if (event.type === "transition") {
-        validateTransition(event.transition);
-        transitions++;
-        ctx.transitions++;
-
-        if (training) {
-          if (winOnly) {
-            matchTransitions.push({
-              transition: event.transition,
-              imitation
-            });
-          } else {
-            ctx.learner.accept(event.transition, imitation);
-          }
-        }
-
-        const key = event.transition.resolvedActionKey;
-        const learnerCharge = event.transition.resolvedCharge;
-        const { stance, button } = getActionParts(key);
-
-        wasdCounts[stance]++;
-        jkilCounts[button]++;
-        moveMatrix[stance][button]++;
-
-        ctx.wasdCounts[stance]++;
-        ctx.jkilCounts[button]++;
-
-        if (needDemoMoves) {
-          matchRoundMoves.push({
-            round: matchRoundMoves.length + 1,
-            learnerMove: key,
-            learnerCharge,
-            learnerLp: event.transition.learnerLp,
-            learnerChi: event.transition.learnerChi,
-            learnerFaint: event.transition.learnerFaint,
-            oppMove: event.transition.opponentActionKey,
-            oppCharge: event.transition.opponentCharge,
-            oppLp: event.transition.oppLp,
-            oppChi: event.transition.oppChi,
-            oppFaint: event.transition.oppFaint
-          });
-        }
-      } else if (event.type === "round") {
-        if (
-          Number.isFinite(event.qSumDelta) &&
-          event.qCountDelta > 0
-        ) {
-          qSum += event.qSumDelta;
-          qCount += event.qCountDelta;
-          ctx.qSum += event.qSumDelta;
-          ctx.qCount += event.qCountDelta;
-        }
-      } else if (event.type === "end") {
-        result = event.result;
-      }
-    }
-
-    if (!result || cancelled) break;
-
-    const prevTotalCtxGames = ctx.baseGames + ctx.games;
-    games++;
-    rounds += result.rounds;
-    ctx.games++;
-    ctx.rounds += result.rounds;
-
-    ctx.matchParameters = updateMatchParameters(
-      ctx.matchParameters,
-      prevTotalCtxGames,
-      result.matchMetrics,
-      ctx.wasdCounts,
-      ctx.jkilCounts
-    );
-
-    let outcome;
-
-    if (result.state.winner === learnerSlot) {
-      wins++;
-      ctx.wins++;
-      outcome = "wins";
-
-      const currentBucketWins = winCountsByDiffOpp[bucketKey] || 0;
-
-      if (currentBucketWins < MAX_WINS_PER_DIFF_OPP && matchRoundMoves) {
-        winCountsByDiffOpp[bucketKey] = currentBucketWins + 1;
-
-        firstWinningGames.push({
-          gameNumber: games,
-          matchupKey: ctx.key,
-          opponentId: oppRider.id,
-          opponentName: oppRider.name || oppRider.id,
-          difficulty: matchOpponentMode,
-          difficultyLabel:
-            modeDisplayNames[matchOpponentMode] || matchOpponentMode,
-          learnerSlot,
-          bucketWinIndex: currentBucketWins + 1,
-          bucketMaxWins: MAX_WINS_PER_DIFF_OPP,
-          totalRounds: result.rounds,
-          moves: matchRoundMoves
-        });
-      }
-
-      if (training && winOnly) {
-        for (const item of matchTransitions) {
-          ctx.learner.accept(item.transition, item.imitation);
-        }
-      }
-    } else if (result.state.winner === "draw") {
-      draws++;
-      ctx.draws++;
-      outcome = "draws";
-    } else if (result.state.winner) {
-      losses++;
-      ctx.losses++;
-      outcome = "losses";
-    } else {
-      throw new Error(
-        "Episode ended without a winner or draw."
-      );
-    }
-
-    ctx.recent.push(outcome === "wins" ? 1 : 0);
-    if (ctx.recent.length > 30) ctx.recent.shift();
-
-    const matchOpponentLabel = job.mode === "mixed"
-      ? (MIXED_MODE_LABELS[matchOpponentMode] || `mixed:${matchOpponentMode}`)
-      : matchOpponentMode;
-
-    const label =
-      `${ctx.key} (${oppRider.id}) / ${matchOpponentLabel} / ${learnerSlot}`;
-
-    let row = breakdown[label];
-    if (!row) {
-      row = {
-        games: 0,
-        wins: 0,
-        losses: 0,
-        draws: 0
-      };
-      breakdown[label] = row;
-    }
-
-    row.games++;
-    row[outcome]++;
-
-    const now = performance.now();
-
-    if (
-      training &&
-      ctx.games % CHECKPOINT_GAME_INTERVAL === 0 &&
-      now - lastCheckpointSent >= CHECKPOINT_MIN_INTERVAL_MS
-    ) {
-      send("checkpoint", {
-        checkpoint: buildCheckpointForContext(ctx)
-      });
-      lastCheckpointSent = performance.now();
-    }
-
-    if (now - lastProgress >= PROGRESS_INTERVAL_MS) {
-      send("progress", { report: report(ctx, false) });
-      lastProgress = performance.now();
-    }
-
-    if (now - lastYield >= YIELD_INTERVAL_MS) {
-      await pause();
-      lastYield = performance.now();
-    }
-  }
-
-  if (training) {
-    for (const ctx of contexts.values()) {
-      if (ctx.games > 0) {
-        send("checkpoint", {
-          checkpoint: buildCheckpointForContext(ctx)
-        });
-      }
-      if (ctx.learner?.replay?.items) {
-        ctx.learner.replay.items.length = 0; // Free worker RAM immediately
-      }
-    }
-  }
-
-  send("done", { report: report(singleCtx, true) });
+  });
 }
 
 self.onmessage = async event => {
