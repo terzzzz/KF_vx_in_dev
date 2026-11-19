@@ -1,16 +1,16 @@
 /* js/soul_pipeline_tests.js
- * Integration checks for the v7 Rider Matrix Bundle & neural pipeline.
- * Build: v5-state256-action17-charge1-reset1-v7matrix
+- Integration checks for the v8 Rider Matrix Bundle & neural pipeline.
+- Build: v5-state256-action17-charge1-reset1-v8matrix
  *
- * Contracts:
- * - 256 observation inputs and 17 actions (42,257 parameters per matchup).
- * - Action index 16 is DO_NOTHING.
- * - Planning masks use reachable-charge legality.
- * - Missing controller inputs mean WAIT.
- * - Repeating a direction preserves its charge clock.
- * - Changing direction resets the charge clock.
- * - Per-Rider Master Bundle (001.json) packs 001_001..001_007 + 10 backup slots
- *   and 10 reserved match parameter slots without cross-matchup weight pollution.
+- Contracts:
+- - 256 observation inputs and 17 actions (42,257 parameters per matchup).
+- - Action index 16 is DO_NOTHING.
+- - Planning masks use reachable-charge legality.
+- - Missing controller inputs mean WAIT.
+- - Repeating a direction preserves its charge clock.
+- - Changing direction resets the charge clock.
+- - Per-Rider Master Bundle (001.json) packs 001_001..001_008 + 9 backup slots
+-   and reserved match parameter slots without cross-matchup weight pollution.
  */
 (function (g) {
   "use strict";
@@ -263,6 +263,60 @@
                 ", coreLegal=" + legal
             );
           });
+        }
+      }
+    });
+
+    test("8-rider roster includes Skyrider (008) and airborne moves require AIR state", () => {
+      const agent = g.SoulAgent;
+      const activeCodes = agent.getActiveCodes();
+
+      assert(
+        data.riders.length >= 8 && activeCodes.includes("008"),
+        "Expected at least 8 active riders (001..008)."
+      );
+
+      const skyrider = data.riders[7];
+      const state = C.createMatch(skyrider, first, data.moves);
+      state.p1.chi = state.p1.maxChi;
+      state.p1.airborneTicks = 0;
+
+      const groundedEnv = E.create(state);
+      const groundedMask = E.mask(groundedEnv, "p1");
+
+      const airMoveEntries = Object.entries(state.moves.p1 || {}).filter(
+        ([, mv]) => mv && mv.requiresAirborne === true
+      );
+
+      assert(
+        airMoveEntries.length > 0,
+        "Skyrider has no moves marked requiresAirborne: true."
+      );
+
+      for (const [key] of airMoveEntries) {
+        const idx = E.ACTION_MAP.indexOf(key);
+        if (idx >= 0) {
+          assert(
+            !groundedMask[idx],
+            `Grounded Skyrider mask should block airborne move ${key}.`
+          );
+        }
+      }
+
+      // Grant AIR state and confirm airborne moves unlock when CHI permits
+      state.p1.airborneTicks = 3;
+      const airEnv = E.create(state);
+      const airMask = E.mask(airEnv, "p1");
+
+      for (const [key, mv] of airMoveEntries) {
+        const idx = E.ACTION_MAP.indexOf(key);
+        const charge = C.maxCharge(state.p1, mv.direction);
+        const legal = Boolean(C.isLegal(state, "p1", { key, charge }));
+        if (idx >= 0) {
+          assert(
+            Boolean(airMask[idx]) === legal,
+            `Airborne Skyrider mask mismatch for ${key}: mask=${airMask[idx]}, legal=${legal}`
+          );
         }
       }
     });
@@ -571,8 +625,15 @@
       );
     });
 
-    test("v7 Rider Matrix Bundle (001.json) pack, backup slots, and isolated matchup round-trip", () => {
+    test("v8 Rider Matrix Bundle (001.json) pack, 9 backup slots, and isolated matchup round-trip", () => {
       const agent = g.SoulAgent;
+      const expectedBackupSlots = Number.isInteger(agent.BACKUP_SLOT_COUNT)
+        ? agent.BACKUP_SLOT_COUNT
+        : 9;
+      const expectedParamSlots = Number.isInteger(agent.RESERVED_PARAM_SLOTS)
+        ? agent.RESERVED_PARAM_SLOTS
+        : expectedBackupSlots;
+
       const input = E.vector(
         E.observe(E.create(fresh()), "p1"),
         spec
@@ -617,22 +678,25 @@
       const bundleValidation = agent.validateRiderBundle(bundle, first.id);
 
       assert(bundleValidation.valid, "Bundle validation failed: " + bundleValidation.error);
-      assert(bundle.backupSlotCount === 10, "Expected 10 backup slots in Rider bundle.");
       assert(
-        Object.keys(bundle.backupSlots).length === 10,
-        "Bundle backupSlots object does not have 10 reserved keys."
+        bundle.backupSlotCount === expectedBackupSlots,
+        `Expected ${expectedBackupSlots} backup slots in Rider bundle, got ${bundle.backupSlotCount}.`
+      );
+      assert(
+        Object.keys(bundle.backupSlots).length === expectedBackupSlots,
+        `Bundle backupSlots object does not have ${expectedBackupSlots} reserved keys.`
       );
 
       const imported = agent.importCandidate(bundle);
-      assert(imported.isBundle === true, "importCandidate did not recognize v7 Rider bundle.");
+      assert(imported.isBundle === true, "importCandidate did not recognize v8 Rider bundle.");
 
       const restored1 = agent.getSection(first.id, first.id, "candidate");
       const restored2 = agent.getSection(first.id, second.id, "candidate");
 
       assert(
         Array.isArray(restored1.matchParameters?.reservedSlots) &&
-          restored1.matchParameters.reservedSlots.length === 10,
-        "Match parameters missing 10 reserved backup slots."
+          restored1.matchParameters.reservedSlots.length === expectedParamSlots,
+        `Match parameters missing ${expectedParamSlots} reserved backup slots.`
       );
 
       const pred1After = N.Network.fromJSON(restored1.net).predict(input);
