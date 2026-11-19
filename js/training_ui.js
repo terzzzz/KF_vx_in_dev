@@ -1,14 +1,14 @@
 /* js/training_ui.js
- * Build: v5-state256-action17
- * Matrix: v7-7riders-10backup (49-Matrix Bidirectional Header Drive Sync Edition)
- * Patch: charge1-reset1
+- Build: v5-state256-action17
+- Matrix: v8-8riders-9backup (64-Matrix Bidirectional Header Drive Sync Edition)
+- Patch: charge1-reset1
  */
 (function (g) {
   "use strict";
 
   const BUILD = "v5-state256-action17";
   const PATCH = "charge1-reset1";
-  const CACHE_TAG = BUILD + "-" + PATCH + "-v7";
+  const CACHE_TAG = BUILD + "-" + PATCH + "-v8";
 
   const EXPECTED_SCHEMA =
     "kf-state256-action17-v2-charge1-reset1";
@@ -36,22 +36,22 @@
     host.classList.add("soul-tools");
 
     host.innerHTML = `
-      <h2>KAMEN FIGHT — v7 RIDER MATRIX TRAINER (49 MATCHUPS + 10 BACKUP SLOTS)</h2>
+      <h2>KAMEN FIGHT — v8 RIDER MATRIX TRAINER (64 MATCHUPS + 9 BACKUP SLOTS)</h2>
 
       <p>
         Build: <strong>${BUILD}</strong> |
-        Matrix: <strong>49-Matchup Matrix (7×7 Riders, Header Drive Sync + IndexedDB)</strong> |
+        Matrix: <strong>64-Matchup Matrix (8×8 Riders, Header Drive Sync + IndexedDB)</strong> |
         Patch: <strong>${PATCH}</strong><br>
-        256 inputs / 17 actions (42,257 params/matchup | 295,799 params/Rider | 10 backup slots reserved).
+        256 inputs / 17 actions (42,257 params/matchup | 338,056 params/Rider | 9 backup slots reserved).
       </p>
 
       <p>
         Turn-based decision picking with an 8-second charge action bar (1–100%).
         Selecting a different direction resets charging to 1%.
         Repeating the same direction preserves its charge clock.
-        Training against <strong>ALL OPPONENTS</strong> cycles across 001..007
+        Training against <strong>ALL OPPONENTS</strong> cycles across 001..008
         with isolated networks and replay buffers (zero cross-matchup weight pollution).
-        Use the <strong>Top Header Panel</strong> to Import/Export all 49 matrices to and from Google Drive.
+        Use the <strong>Top Header Panel</strong> to Import/Export all 64 matrices to and from Google Drive.
       </p>
 
       <div class="soul-fields">
@@ -94,7 +94,7 @@
                  min="2"
                  max="100000"
                  step="1"
-                 value="420">
+                 value="480">
         </label>
 
         <label>Evaluation matches
@@ -103,7 +103,7 @@
                  min="2"
                  max="100000"
                  step="2"
-                 value="140">
+                 value="160">
         </label>
 
         <label>Guidance % (0–100)
@@ -284,8 +284,29 @@
     }
 
     // =========================================================================
-    // 49-MATRIX HEADER PANEL <-> SOULAGENT BIDIRECTIONAL BRIDGE
+    // 64-MATRIX HEADER PANEL <-> SOULAGENT BIDIRECTIONAL BRIDGE
     // =========================================================================
+
+    function getHeaderRamPool() {
+      const pool = g.__KF_MATRIX64_RAM__ || g.__KF_MATRIX49_RAM__ || {};
+      g.__KF_MATRIX64_RAM__ = pool;
+      g.__KF_MATRIX49_RAM__ = pool;
+      return pool;
+    }
+
+    function triggerHeaderGridRender() {
+      if (typeof g.render64MatrixHeaderGrid === "function") {
+        g.render64MatrixHeaderGrid();
+      } else if (typeof g.render49MatrixHeaderGrid === "function") {
+        g.render49MatrixHeaderGrid();
+      }
+    }
+
+    function getMaxRosterCapacity() {
+      const activeCount = g.SoulAgent?.getActiveCodes?.()?.length || 0;
+      const dataCount = data?.riders?.length || 0;
+      return Math.max(8, activeCount, dataCount);
+    }
 
     function syncToHeaderPool(cp, selectedLearner) {
       if (!cp || !g.SoulAgent) return;
@@ -294,13 +315,14 @@
         const oCode = g.SoulAgent.toCode(cp.opponentId);
         const p1Idx = parseInt(lCode, 10) - 1;
         const p2Idx = parseInt(oCode, 10) - 1;
+        const maxRiders = getMaxRosterCapacity();
 
         if (
-          Number.isInteger(p1Idx) && p1Idx >= 0 && p1Idx < 7 &&
-          Number.isInteger(p2Idx) && p2Idx >= 0 && p2Idx < 7
+          Number.isInteger(p1Idx) && p1Idx >= 0 && p1Idx < maxRiders &&
+          Number.isInteger(p2Idx) && p2Idx >= 0 && p2Idx < maxRiders
         ) {
           const mId = `r${p1Idx}_vs_r${p2Idx}`;
-          const ramPool = (g.__KF_MATRIX49_RAM__ = g.__KF_MATRIX49_RAM__ || {});
+          const ramPool = getHeaderRamPool();
           ramPool[mId] = {
             ...(ramPool[mId] || {}),
             matchupKey: mId,
@@ -314,9 +336,7 @@
           };
         }
 
-        if (typeof g.render49MatrixHeaderGrid === "function") {
-          g.render49MatrixHeaderGrid();
-        }
+        triggerHeaderGridRender();
       } catch (err) {
         console.warn("[Training UI] Header pool sync warning:", err);
       }
@@ -329,10 +349,11 @@
 
       let imported = 0;
       let exported = 0;
-      const ramPool = (g.__KF_MATRIX49_RAM__ = g.__KF_MATRIX49_RAM__ || {});
+      const ramPool = getHeaderRamPool();
+      const maxRiders = getMaxRosterCapacity();
 
-      for (let i = 0; i < data.riders.length && i < 7; i++) {
-        for (let j = 0; j < data.riders.length && j < 7; j++) {
+      for (let i = 0; i < data.riders.length && i < maxRiders; i++) {
+        for (let j = 0; j < data.riders.length && j < maxRiders; j++) {
           const learnerId = data.riders[i].id;
           const opponentId = data.riders[j].id;
           const mId = `r${i}_vs_r${j}`;
@@ -354,9 +375,7 @@
         }
       }
 
-      if (typeof g.render49MatrixHeaderGrid === "function") {
-        g.render49MatrixHeaderGrid();
-      }
+      triggerHeaderGridRender();
 
       return { imported, exported, initialized: 0 };
     }
@@ -429,11 +448,12 @@
       };
 
       const codes = agent ? agent.getActiveCodes() : [];
+      const lastCode = codes[codes.length - 1] || "008";
 
       const lines = [
         validSelection
           ? isMulti
-            ? `Selected Learner: Rider ${learnerCode} (${learnerCode}_001 .. ${learnerCode}_${codes[codes.length - 1] || "007"} Auto-Cycle + 10 backup slots)`
+            ? `Selected Learner: Rider ${learnerCode} (${learnerCode}_001 .. ${learnerCode}_${lastCode} Auto-Cycle + 9 backup slots)`
             : `Selected Matchup: ${agent.getCanonicalKey(selected.learner, selected.opponent)}`
           : "Loading matchup data…",
 
@@ -458,7 +478,7 @@
       ].filter(Boolean);
 
       if (data && agent) {
-        lines.push("", `CANDIDATE MATCHUP MATRIX (${codes.length}x${codes.length} ACTIVE + 10 BACKUP SLOTS)`);
+        lines.push("", `CANDIDATE MATCHUP MATRIX (${codes.length}x${codes.length} = ${codes.length * codes.length} ACTIVE + 9 BACKUP SLOTS)`);
 
         const matrix = agent.getMatchupBreakdown("candidate");
 
@@ -481,9 +501,7 @@
 
       statusEl.textContent = lines.join("\n");
 
-      if (typeof g.render49MatrixHeaderGrid === "function") {
-        g.render49MatrixHeaderGrid();
-      }
+      triggerHeaderGridRender();
 
       return {
         isMulti,
@@ -739,7 +757,7 @@
         const mp = report.matchParameters;
         lines.push(
           "",
-          "MATCH PARAMETER TELEMETRY (ACTIVE CONTEXT + 10 RESERVED SLOTS)",
+          "MATCH PARAMETER TELEMETRY (ACTIVE CONTEXT + 9 RESERVED SLOTS)",
           `  Avg Final LP (Own / Opp): ${(100 * mp.avgFinalLpRatio).toFixed(1)}% / ${(100 * mp.avgEnemyFinalLpRatio).toFixed(1)}%`,
           `  Avg Damage (Dealt / Taken): ${(100 * mp.avgDamageDealtRatio).toFixed(1)}% / ${(100 * mp.avgDamageTakenRatio).toFixed(1)}%`,
           `  Avg Chi/Round (Earned / Spent / NetAdv): ${mp.avgChiEarned.toFixed(2)} / ${mp.avgChiSpent.toFixed(2)} / ${mp.avgNetChiAdvantage.toFixed(2)}`,
@@ -1073,7 +1091,7 @@
                 formatReport(report) +
                 (
                   training
-                    ? "\n\nCandidate matchup(s) saved to IndexedDB and synced to the 49-Matrix Header Panel."
+                    ? "\n\nCandidate matchup(s) saved to IndexedDB and synced to the 64-Matrix Header Panel."
                     : report.cancelled
                       ? "\n\nIncomplete evaluation was not recorded for activation."
                       : "\n\nEvaluation finished and recorded."
@@ -1243,9 +1261,12 @@
 
       data = (await g.SoulAgent.ready()).data;
 
+      const codes = g.SoulAgent.getActiveCodes ? g.SoulAgent.getActiveCodes() : [];
+      const lastCode = codes[codes.length - 1] || "008";
+
       const allOption = document.createElement("option");
       allOption.value = "*";
-      allOption.textContent = `ALL OPPONENTS [001–${g.SoulAgent.formatCodeNumber ? g.SoulAgent.getActiveCodes().slice(-1)[0] : "007"} Auto-Cycle]`;
+      allOption.textContent = `ALL OPPONENTS [001–${lastCode} Auto-Cycle]`;
       field("opponent").appendChild(allOption);
 
       for (const rider of data.riders) {
@@ -1266,10 +1287,10 @@
       const syncStats = syncWithHeaderPool();
 
       output(
-        "Ready (v7 49-Matrix Mode — IndexedDB + Google Drive Sync).\n" +
+        "Ready (v8 64-Matrix Mode — IndexedDB + Google Drive Sync).\n" +
         `Header Pool <-> SoulAgent Synced (Imported: ${syncStats.imported}, Preserved: ${syncStats.exported}).\n` +
-        "Select ALL OPPONENTS to auto-cycle training across all Riders with isolated matchup networks.\n" +
-        "Use the Top Header Panel to Import/Export all 49 matrices to and from Google Drive."
+        "Select ALL OPPONENTS to auto-cycle training across all 8 Riders with isolated matchup networks.\n" +
+        "Use the Top Header Panel to Import/Export all 64 matrices to and from Google Drive."
       );
     } catch (error) {
       data = null;
