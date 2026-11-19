@@ -1,14 +1,14 @@
 /* js/training_worker.js
- * Build: v5-state256-action17
- * Matrix: v7-7riders-10backup
- * Patch: charge1-reset1 (Turbo-Optimized Worker)
+- Build: v5-state256-action17
+- Matrix: v8-8riders-9backup (64-Matchup Capacity)
+- Patch: charge1-reset1 (Turbo-Optimized Worker)
  */
 "use strict";
 
 const BUILD = "v5-state256-action17";
 const VERSION = "kf-soul-ddqn-v5-state256-action17";
 const PATCH = "charge1-reset1";
-const CACHE_TAG = BUILD + "-" + PATCH + "-v7";
+const CACHE_TAG = BUILD + "-" + PATCH + "-v8";
 
 const EXPECTED_SCHEMA =
   "kf-state256-action17-v2-charge1-reset1";
