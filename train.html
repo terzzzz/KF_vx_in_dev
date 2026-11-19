@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1"
   >
 
-  <title>Kamen Fight — RIDER Training (64 Matchup Matrices)</title>
+  <title>Kamen Fight — RIDER Training (Row-by-Row 8×8 Matrix)</title>
 
   <style>
     body {
@@ -30,7 +30,7 @@
       display: none !important;
     }
 
-    .matrix64-bar {
+    .matrix-row-bar {
       margin: 12px 0 20px;
       padding: 14px 16px;
       background: #0d1520;
@@ -41,14 +41,14 @@
       gap: 10px;
     }
 
-    .matrix64-row {
+    .matrix-flex-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 10px;
     }
 
-    .matrix64-badge {
+    .matrix-badge {
       padding: 4px 10px;
       border-radius: 4px;
       font-size: 0.82rem;
@@ -58,7 +58,29 @@
       color: #00ffcc;
     }
 
-    .matrix64-btn {
+    .matrix-badge.disconnected {
+      border-color: #ffaa44;
+      color: #ffd088;
+      background: #241a10;
+    }
+
+    .matrix-select,
+    .matrix-input {
+      padding: 6px 10px;
+      border-radius: 5px;
+      border: 1px solid #335566;
+      background: #060a0f;
+      color: #effffb;
+      font-family: monospace;
+      font-size: 0.82rem;
+    }
+
+    .matrix-input {
+      flex: 1;
+      min-width: 260px;
+    }
+
+    .matrix-btn {
       cursor: pointer;
       padding: 6px 12px;
       border-radius: 5px;
@@ -69,33 +91,32 @@
       font-size: 0.84rem;
     }
 
-    .matrix64-btn:hover {
+    .matrix-btn:hover {
       background: #00ffcc;
       color: #061018;
     }
 
-    .matrix64-input {
-      flex: 1;
-      min-width: 260px;
-      padding: 6px 10px;
-      border-radius: 5px;
-      border: 1px solid #335566;
-      background: #060a0f;
-      color: #effffb;
-      font-family: monospace;
-      font-size: 0.82rem;
+    .matrix-btn.danger {
+      border-color: #ff7766;
+      background: #2b1414;
+      color: #ffcfc9;
     }
 
-    .matrix64-grid {
+    .matrix-btn.danger:hover {
+      background: #ff7766;
+      color: #140606;
+    }
+
+    .matrix-row-grid {
       display: grid;
       grid-template-columns: repeat(8, minmax(95px, 1fr));
-      gap: 4px;
+      gap: 6px;
       margin-top: 6px;
     }
 
-    .matrix64-cell {
-      padding: 4px 6px;
-      font-size: 0.72rem;
+    .matrix-cell {
+      padding: 6px 6px;
+      font-size: 0.74rem;
       font-family: monospace;
       background: #091018;
       border: 1px solid #1e3346;
@@ -104,7 +125,7 @@
       color: #9cc2d8;
     }
 
-    .matrix64-cell.ready {
+    .matrix-cell.ready {
       border-color: #00ffcc;
       color: #00ffcc;
       background: #0a2422;
@@ -129,83 +150,97 @@
     <a href="index.html">← Return to game</a>
   </p>
 
-  <!-- 64-Matchup Matrix & Google Script Control Bar -->
-  <section id="matrix64-control-bar" class="matrix64-bar">
-    <div class="matrix64-row">
-      <span class="matrix64-badge">
+  <!-- Row-Isolated Google Drive & Memory Control Bar (8 Files per Row) -->
+  <section id="matrix-row-control-bar" class="matrix-row-bar">
+    <div class="matrix-flex-row">
+      <span class="matrix-badge">
         GDrive Folder: 15P5HeKqLxMYw3ykirJj2HMT726SZnkId
       </span>
-      <span id="matrix64-mode-badge" class="matrix64-badge">
+      <span id="matrix-conn-badge" class="matrix-badge">
+        LINK: IDLE (Row r0)
+      </span>
+      <span id="matrix-mode-badge" class="matrix-badge">
         MODE: TRAIN (Live Search OFF)
       </span>
-      <span id="matrix64-count-badge" class="matrix64-badge">
-        MATRICES: 64 / 64 MAPPED
+      <span id="matrix-row-count-badge" class="matrix-badge">
+        ROW r0: 0 / 8 LOADED
       </span>
+    </div>
+
+    <div class="matrix-flex-row">
+      <label for="active-row-select" style="font-size:0.84rem;color:#9cc2d8;font-weight:600;">
+        Active Rider Row:
+      </label>
+      <select id="active-row-select"
+              class="matrix-select"
+              onchange="window.switchActiveMatrixRow(Number(this.value), true)">
+        <option value="0">Row r0 — Kamen Rider Ichigo [001] (8 files)</option>
+        <option value="1">Row r1 — Kamen Rider Nigo [002] (8 files)</option>
+        <option value="2">Row r2 — Kamen Rider V3 [003] (8 files)</option>
+        <option value="3">Row r3 — Riderman [004] (8 files)</option>
+        <option value="4">Row r4 — Kamen Rider X [005] (8 files)</option>
+        <option value="5">Row r5 — Kamen Rider Amazon [006] (8 files)</option>
+        <option value="6">Row r6 — Kamen Rider Stronger [007] (8 files)</option>
+        <option value="7">Row r7 — Skyrider [008] (8 files)</option>
+      </select>
 
       <button type="button"
-              class="matrix64-btn"
+              class="matrix-btn"
+              onclick="window.loadActiveRowFromDrive()">
+        1. Pull Row (8 Files) ← Drive
+      </button>
+
+      <button type="button"
+              class="matrix-btn"
+              onclick="window.syncActiveRowToDrive()">
+        2. Sync Row (8 Files) → Drive
+      </button>
+
+      <button type="button"
+              class="matrix-btn danger"
+              onclick="window.cutConnectionAndPurgeRowRAM()">
+        3. Cut Connection & Purge Row RAM
+      </button>
+
+      <button type="button"
+              class="matrix-btn"
               onclick="window.setTrainingExecutionMode('train')">
-        Train Mode (Live Search OFF)
+        Train Mode
       </button>
 
       <button type="button"
-              class="matrix64-btn"
+              class="matrix-btn"
               onclick="window.setTrainingExecutionMode('eval')">
-        Eval Mode (Live Search ON)
+        Eval Mode
       </button>
 
       <button type="button"
-              class="matrix64-btn"
-              onclick="window.initAll64MatchupMatrices()">
-        Init All 64 Matrices
-      </button>
-
-      <button type="button"
-              class="matrix64-btn"
-              onclick="window.syncAll64MatricesToDrive()">
-        Sync 64 Matrices → Google Drive
-      </button>
-
-      <button type="button"
-              class="matrix64-btn"
-              onclick="window.loadAll64MatricesFromDrive()">
-        Pull 64 Matrices ← Google Drive
-      </button>
-
-      <button type="button"
-              class="matrix64-btn"
-              onclick="const el=document.getElementById('matrix64-grid-drawer'); el.hidden=!el.hidden;">
-        Toggle 8×8 Grid
-      </button>
-
-      <button type="button"
-              class="matrix64-btn"
+              class="matrix-btn"
               onclick="const el=document.getElementById('gas-script-drawer'); el.hidden=!el.hidden;">
         Google Script (Code.gs)
       </button>
     </div>
 
-    <div class="matrix64-row">
+    <div class="matrix-flex-row">
       <label for="gas-webapp-url-input" style="font-size:0.82rem;color:#9cc2d8;">
         Google Script Web App URL:
       </label>
       <input id="gas-webapp-url-input"
              type="url"
-             class="matrix64-input"
+             class="matrix-input"
              placeholder="https://script.google.com/macros/s/.../exec"
              onchange="window.MatrixStorage.setGasWebAppUrl(this.value)">
-      <span id="matrix64-sync-status" style="font-size:0.82rem;color:#00ffcc;">
-        Ready.
+      <span id="matrix-sync-status" style="font-size:0.82rem;color:#00ffcc;">
+        Row r0 selected. Only 8 files will be held in active RAM.
       </span>
     </div>
 
-    <div id="matrix64-grid-drawer" hidden>
-      <div id="matrix64-grid" class="matrix64-grid"></div>
-    </div>
+    <!-- Active Row 8-Cell Strip -->
+    <div id="matrix-active-row-grid" class="matrix-row-grid"></div>
 
     <div id="gas-script-drawer" hidden>
       <div style="font-size:0.8rem;color:#9cc2d8;">
-        Deploy this Google Apps Script as a Web App to read/write all 64 matrix files directly inside Google Drive folder <code>15P5HeKqLxMYw3ykirJj2HMT726SZnkId</code>:
+        Google Apps Script (<code>Code.gs</code>) supporting all 64 files (<code>r0</code>..<code>r7</code>) row-by-row in folder <code>15P5HeKqLxMYw3ykirJj2HMT726SZnkId</code>:
       </div>
       <pre id="gas-script-code" class="gas-code-pre"></pre>
     </div>
@@ -217,14 +252,14 @@
 
   <noscript>JavaScript is required.</noscript>
 
-  <!-- 64-Matchup Matrix Manifest & Google Script Section -->
+  <!-- Row-Scoped Matrix Storage & Google Script Bridge -->
   <script>
     (function (g) {
       "use strict";
 
       const GDRIVE_FOLDER_ID = "15P5HeKqLxMYw3ykirJj2HMT726SZnkId";
       const GAS_URL_STORAGE_KEY = "kf_gdrive_gas_webapp_url";
-      const RAM_MATRIX64 = (g.__KF_MATRIX64_RAM__ = g.__KF_MATRIX49_RAM__ = g.__KF_MATRIX64_RAM__ || g.__KF_MATRIX49_RAM__ || {});
+      const RAM_ROW_CACHE = (g.__KF_MATRIX64_RAM__ = g.__KF_MATRIX49_RAM__ = {});
 
       const ACTIVE_RIDERS_8 = [
         { index: 0, id: "ichigo",   code: "r0", soulCode: "001", name: "Kamen Rider Ichigo" },
@@ -237,12 +272,14 @@
         { index: 7, id: "skyrider", code: "r7", soulCode: "008", name: "Skyrider" }
       ];
 
-      // 64 Matchup Matrices (8 Riders x 8 Riders)
-      const HARDCODED_64_MATRICES = {};
-      for (const rA of ACTIVE_RIDERS_8) {
-        for (const rB of ACTIVE_RIDERS_8) {
+      let activeRowIndex = 0;
+      let activeAbortController = null;
+
+      function getRowManifest(rowIdx) {
+        const rA = ACTIVE_RIDERS_8[rowIdx] || ACTIVE_RIDERS_8[0];
+        return ACTIVE_RIDERS_8.map(rB => {
           const key = `r${rA.index}_vs_r${rB.index}`;
-          HARDCODED_64_MATRICES[key] = {
+          return {
             key,
             p1: rA.index,
             p2: rB.index,
@@ -251,7 +288,7 @@
             soulKey: `${rA.soulCode}_${rB.soulCode}`,
             file: `matrix_${key}.json`
           };
-        }
+        });
       }
 
       function syncManifestWithDataset(riders) {
@@ -260,15 +297,6 @@
           if (riders[i]?.id) ACTIVE_RIDERS_8[i].id = riders[i].id;
           if (riders[i]?.name) ACTIVE_RIDERS_8[i].name = riders[i].name;
         }
-        for (const rA of ACTIVE_RIDERS_8) {
-          for (const rB of ACTIVE_RIDERS_8) {
-            const entry = HARDCODED_64_MATRICES[`r${rA.index}_vs_r${rB.index}`];
-            if (entry) {
-              entry.p1Id = rA.id;
-              entry.p2Id = rB.id;
-            }
-          }
-        }
       }
 
       const VALID_64_FILE_LINES = ACTIVE_RIDERS_8.map(rA =>
@@ -276,7 +304,7 @@
       ).join(",\n");
 
       const GOOGLE_APPS_SCRIPT_TEMPLATE = [
-        "/* Google Apps Script (Code.gs) for Kamen Fight 64 Matchup Matrices */",
+        "/* Google Apps Script (Code.gs) for Kamen Fight 64 Matchup Matrices (Row-by-Row) */",
         "const FOLDER_ID = '15P5HeKqLxMYw3ykirJj2HMT726SZnkId';",
         "const VALID_64_FILES = new Set([",
         VALID_64_FILE_LINES,
@@ -290,10 +318,6 @@
         "",
         "function doPost(e) {",
         "  const body = JSON.parse(e.postData.contents || '{}');",
-        "  if (body.action === 'saveBatch' && Array.isArray(body.items)) {",
-        "    const saved = body.items.map(item => saveMatrixToDriveFolder(FOLDER_ID, item.fileName, JSON.stringify(item.payload)));",
-        "    return ContentService.createTextOutput(JSON.stringify({ ok: true, count: saved.length })).setMimeType(ContentService.MimeType.JSON);",
-        "  }",
         "  const file = body.fileName || ('matrix_' + body.key + '.json');",
         "  const res = saveMatrixToDriveFolder(FOLDER_ID, file, JSON.stringify(body.payload));",
         "  return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);",
@@ -338,7 +362,18 @@
       function getEntry(riderA, riderB) {
         const a = resolveRiderIndex(riderA);
         const b = resolveRiderIndex(riderB);
-        return HARDCODED_64_MATRICES[`r${a}_vs_r${b}`];
+        const rA = ACTIVE_RIDERS_8[a];
+        const rB = ACTIVE_RIDERS_8[b];
+        const key = `r${a}_vs_r${b}`;
+        return {
+          key,
+          p1: a,
+          p2: b,
+          p1Id: rA.id,
+          p2Id: rB.id,
+          soulKey: `${rA.soulCode}_${rB.soulCode}`,
+          file: `matrix_${key}.json`
+        };
       }
 
       function getGasWebAppUrl() {
@@ -359,99 +394,67 @@
         return trimmed;
       }
 
-      async function loadMatchupMatrix(riderA, riderB) {
+      function purgeRamCache() {
+        for (const k of Object.keys(RAM_ROW_CACHE)) {
+          delete RAM_ROW_CACHE[k];
+        }
+      }
+
+      async function loadMatchupMatrix(riderA, riderB, signal) {
         const entry = getEntry(riderA, riderB);
         const gasUrl = getGasWebAppUrl();
 
         if (gasUrl) {
-          try {
-            const sep = gasUrl.includes("?") ? "&" : "?";
-            const url =
-              `${gasUrl}${sep}action=load&folderId=${encodeURIComponent(GDRIVE_FOLDER_ID)}` +
-              `&key=${encodeURIComponent(entry.key)}&file=${encodeURIComponent(entry.file)}&t=${Date.now()}`;
-            const res = await fetch(url, { method: "GET", cache: "no-store" });
-            if (res.ok) {
-              const json = await res.json();
-              const matrixPayload = json?.matrix || json?.data || json;
-              if (
-                matrixPayload &&
-                typeof matrixPayload === "object" &&
-                (matrixPayload.net ||
-                  matrixPayload.layers ||
-                  matrixPayload.soulCandidate ||
-                  matrixPayload.soulActive ||
-                  matrixPayload.soulCheckpoint ||
-                  matrixPayload.checkpoint)
-              ) {
-                RAM_MATRIX64[entry.key] = matrixPayload;
-                if (typeof g.SoulAgent?.ingestDriveMatchup === "function") {
-                  try {
-                    g.SoulAgent.ingestDriveMatchup(matrixPayload, entry.p1Id, entry.p2Id);
-                  } catch (err) {
-                    console.warn(`[MatrixStorage] SoulAgent ingest warning (${entry.key}):`, err);
-                  }
-                }
-                return matrixPayload;
-              }
-            }
-          } catch (_) {}
-        }
-
-        if (g.google?.script?.run) {
-          try {
-            const gasData = await new Promise((resolve, reject) => {
-              g.google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .loadMatrixFromDriveFolder(GDRIVE_FOLDER_ID, entry.file);
-            });
-            if (gasData) {
-              const parsed = typeof gasData === "string" ? JSON.parse(gasData) : gasData;
-              RAM_MATRIX64[entry.key] = parsed;
+          const sep = gasUrl.includes("?") ? "&" : "?";
+          const url =
+            `${gasUrl}${sep}action=load&folderId=${encodeURIComponent(GDRIVE_FOLDER_ID)}` +
+            `&key=${encodeURIComponent(entry.key)}&file=${encodeURIComponent(entry.file)}&t=${Date.now()}`;
+          const res = await fetch(url, { method: "GET", cache: "no-store", signal });
+          if (res.ok) {
+            const json = await res.json();
+            const matrixPayload = json?.matrix || json?.data || json;
+            if (
+              matrixPayload &&
+              typeof matrixPayload === "object" &&
+              (matrixPayload.net ||
+                matrixPayload.layers ||
+                matrixPayload.soulCandidate ||
+                matrixPayload.soulActive ||
+                matrixPayload.soulCheckpoint ||
+                matrixPayload.checkpoint)
+            ) {
+              RAM_ROW_CACHE[entry.key] = {
+                matchupKey: entry.key,
+                canonicalKey: entry.soulKey,
+                games: matrixPayload.games || matrixPayload.soulCandidate?.games || matrixPayload.soulActive?.games || 0,
+                steps: matrixPayload.steps || matrixPayload.soulCandidate?.steps || matrixPayload.soulActive?.steps || 0
+              };
               if (typeof g.SoulAgent?.ingestDriveMatchup === "function") {
-                try {
-                  g.SoulAgent.ingestDriveMatchup(parsed, entry.p1Id, entry.p2Id);
-                } catch (_) {}
+                g.SoulAgent.ingestDriveMatchup(matrixPayload, entry.p1Id, entry.p2Id);
               }
-              return parsed;
+              return true;
             }
-          } catch (_) {}
+          }
         }
-
-        if (RAM_MATRIX64[entry.key]) {
-          return RAM_MATRIX64[entry.key];
-        }
-
-        for (const folder of ["models/matrices_64", "models/matrices_49"]) {
-          try {
-            const localRes = await fetch(`${folder}/${entry.file}`, { cache: "no-store" });
-            if (localRes.ok) {
-              const localJson = await localRes.json();
-              RAM_MATRIX64[entry.key] = localJson;
-              return localJson;
-            }
-          } catch (_) {}
-        }
-
-        return null;
+        return false;
       }
 
-      async function saveMatchupMatrix(riderA, riderB, payload) {
+      async function saveMatchupMatrix(riderA, riderB, signal) {
         const entry = getEntry(riderA, riderB);
+        const gasUrl = getGasWebAppUrl();
+        if (!gasUrl) {
+          throw new Error("Paste your Google Script Web App URL first.");
+        }
 
-        // Attach the live SoulAgent Candidate & Active checkpoints for this exact matchup
         let soulCandidate = null;
         let soulActive = null;
         if (g.SoulAgent?.getSection) {
-          try {
-            soulCandidate = g.SoulAgent.getSection(entry.p1Id, entry.p2Id, "candidate") || null;
-            soulActive = g.SoulAgent.getSection(entry.p1Id, entry.p2Id, "active") || null;
-          } catch (_) {}
+          soulCandidate = g.SoulAgent.getSection(entry.p1Id, entry.p2Id, "candidate") || null;
+          soulActive = g.SoulAgent.getSection(entry.p1Id, entry.p2Id, "active") || null;
         }
         const bestSoul = soulCandidate || soulActive || null;
 
-        const enriched = {
-          ...(payload || {}),
+        let payloadString = JSON.stringify({
           matchupKey: entry.key,
           canonicalKey: entry.soulKey,
           fileName: entry.file,
@@ -460,66 +463,296 @@
           p2Rider: entry.p2Id,
           learnerId: entry.p1Id,
           opponentId: entry.p2Id,
-          games: bestSoul ? bestSoul.games : (payload?.games || 0),
-          steps: bestSoul ? bestSoul.steps : (payload?.steps || 0),
+          games: bestSoul ? bestSoul.games : 0,
+          steps: bestSoul ? bestSoul.steps : 0,
           soulCandidate,
           soulActive,
           updatedAt: new Date().toISOString()
-        };
+        });
 
-        RAM_MATRIX64[entry.key] = enriched;
+        const bodyString = JSON.stringify({
+          action: "save",
+          folderId: GDRIVE_FOLDER_ID,
+          key: entry.key,
+          fileName: entry.file,
+          payload: JSON.parse(payloadString)
+        });
+        payloadString = null;
 
-        const gasUrl = getGasWebAppUrl();
-        if (gasUrl) {
-          try {
-            const res = await fetch(gasUrl, {
-              method: "POST",
-              headers: { "Content-Type": "text/plain;charset=utf-8" },
-              body: JSON.stringify({
-                action: "save",
-                folderId: GDRIVE_FOLDER_ID,
-                key: entry.key,
-                fileName: entry.file,
-                payload: enriched
-              })
-            });
-            if (res.ok) return await res.json();
-          } catch (_) {}
+        const res = await fetch(gasUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: bodyString,
+          signal
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status} saving ${entry.file}`);
         }
-
-        if (g.google?.script?.run) {
-          try {
-            return await new Promise((resolve, reject) => {
-              g.google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .saveMatrixToDriveFolder(GDRIVE_FOLDER_ID, entry.file, JSON.stringify(enriched));
-            });
-          } catch (_) {}
-        }
-
-        return enriched;
+        return await res.json();
       }
 
-      g.MATCHUP_64_MANIFEST = HARDCODED_64_MATRICES;
-      g.MATCHUP_49_MANIFEST = HARDCODED_64_MATRICES;
-      g.ACTIVE_RIDERS_8 = ACTIVE_RIDERS_8;
-      g.ACTIVE_RIDERS_7 = ACTIVE_RIDERS_8;
+      function renderActiveRowGrid() {
+        const gridEl = document.getElementById("matrix-active-row-grid");
+        if (!gridEl) return;
+
+        const rowEntries = getRowManifest(activeRowIndex);
+        let readyCount = 0;
+        let trainedCount = 0;
+
+        gridEl.innerHTML = rowEntries.map(entry => {
+          let soulCand = null;
+          let soulAct = null;
+          try {
+            soulCand = g.SoulAgent?.getSection?.(entry.p1Id, entry.p2Id, "candidate") || null;
+            soulAct = g.SoulAgent?.getSection?.(entry.p1Id, entry.p2Id, "active") || null;
+          } catch (_) {}
+
+          const soulCp = soulCand || soulAct;
+          const cachedMeta = RAM_ROW_CACHE[entry.key];
+          const isReady = Boolean(soulCp) || Boolean(cachedMeta);
+          const games = soulCp?.games ?? cachedMeta?.games ?? 0;
+
+          if (isReady) readyCount++;
+          if (games > 0) trainedCount++;
+
+          const label = isReady ? `READY (${games}G)` : "EMPTY";
+
+          return `
+            <div class="matrix-cell ${isReady ? "ready" : ""}"
+                 title="${entry.file} (${entry.p1Id} vs ${entry.p2Id} | Games: ${games})">
+              <div>${entry.key}</div>
+              <div>${entry.soulKey} • ${label}</div>
+            </div>
+          `;
+        }).join("");
+
+        const countBadge = document.getElementById("matrix-row-count-badge");
+        if (countBadge) {
+          countBadge.textContent = `ROW r${activeRowIndex}: ${trainedCount} TRAINED / ${readyCount} READY (OF 8)`;
+        }
+      }
+
+      function setConnBadge(text, disconnected = false) {
+        const badge = document.getElementById("matrix-conn-badge");
+        if (!badge) return;
+        badge.textContent = text;
+        badge.classList.toggle("disconnected", disconnected);
+      }
+
+      g.getActiveMatrixRowIndex = () => activeRowIndex;
+      g.getActiveRowEntries = () => getRowManifest(activeRowIndex);
+      g.render64MatrixHeaderGrid = renderActiveRowGrid;
+      g.render49MatrixHeaderGrid = renderActiveRowGrid;
+
+      g.setTrainingExecutionMode = function (mode) {
+        const target = mode === "eval" ? "eval" : "train";
+        if (g.SoulEnv?.setExecutionMode) {
+          g.SoulEnv.setExecutionMode(target);
+        }
+        const badge = document.getElementById("matrix-mode-badge");
+        if (badge) {
+          badge.textContent = target === "train"
+            ? "MODE: TRAIN (Live Search OFF)"
+            : "MODE: EVAL (Live Search ON)";
+        }
+        return target;
+      };
+
+      g.cutConnectionAndPurgeRowRAM = function (silent = false) {
+        if (activeAbortController) {
+          try { activeAbortController.abort(); } catch (_) {}
+          activeAbortController = null;
+        }
+
+        if (typeof g.SoulTrainer?.disconnectAndPurge === "function") {
+          g.SoulTrainer.disconnectAndPurge();
+        }
+
+        purgeRamCache();
+        setConnBadge(`LINK: CUT / PURGED (Row r${activeRowIndex})`, true);
+        renderActiveRowGrid();
+
+        if (!silent) {
+          const status = document.getElementById("matrix-sync-status");
+          if (status) {
+            status.textContent =
+              `Cut Google Drive connection, stopped worker, and purged RAM buffers for Row r${activeRowIndex}. Safe to switch row.`;
+          }
+        }
+      };
+
+      g.switchActiveMatrixRow = function (newRowIdx, purgePrevious = true) {
+        const clamped = Math.max(0, Math.min(ACTIVE_RIDERS_8.length - 1, Number(newRowIdx) || 0));
+        if (purgePrevious && clamped !== activeRowIndex) {
+          g.cutConnectionAndPurgeRowRAM(true);
+        }
+        activeRowIndex = clamped;
+
+        const rowSelect = document.getElementById("active-row-select");
+        if (rowSelect && Number(rowSelect.value) !== activeRowIndex) {
+          rowSelect.value = String(activeRowIndex);
+        }
+
+        const riderObj = ACTIVE_RIDERS_8[activeRowIndex];
+        if (riderObj && typeof g.SoulTrainer?.setLearnerId === "function") {
+          g.SoulTrainer.setLearnerId(riderObj.id);
+        }
+
+        setConnBadge(`LINK: READY (Row r${activeRowIndex})`, false);
+        renderActiveRowGrid();
+
+        const status = document.getElementById("matrix-sync-status");
+        if (status && riderObj) {
+          status.textContent =
+            `Switched to Row r${activeRowIndex} (${riderObj.name} [${riderObj.soulCode}]). Only 8 files active.`;
+        }
+      };
+
+      g.loadActiveRowFromDrive = async function () {
+        const status = document.getElementById("matrix-sync-status");
+        const gasUrl = getGasWebAppUrl();
+        if (!gasUrl) {
+          if (status) status.textContent = "Enter Google Script Web App URL before pulling.";
+          return 0;
+        }
+
+        if (activeAbortController) {
+          try { activeAbortController.abort(); } catch (_) {}
+        }
+        activeAbortController = new AbortController();
+        const signal = activeAbortController.signal;
+
+        if (g.SoulAgent?.ready) {
+          const res = await g.SoulAgent.ready();
+          if (res?.data?.riders) syncManifestWithDataset(res.data.riders);
+        }
+
+        const rowEntries = getRowManifest(activeRowIndex);
+        setConnBadge(`LINK: PULLING ROW r${activeRowIndex}…`, false);
+
+        let loaded = 0;
+        try {
+          for (let i = 0; i < rowEntries.length; i++) {
+            const entry = rowEntries[i];
+            if (status) {
+              status.textContent =
+                `Pulling Row r${activeRowIndex}: file ${i + 1} / 8 (${entry.file} [${entry.soulKey}])…`;
+            }
+            const ok = await loadMatchupMatrix(entry.p1, entry.p2, signal);
+            if (ok) loaded++;
+          }
+
+          await g.SoulAgent?.flushStorage?.();
+          renderActiveRowGrid();
+          g.SoulTrainer?.refreshUI?.();
+
+          setConnBadge(`LINK: CONNECTED (Row r${activeRowIndex})`, false);
+          if (status) {
+            status.textContent =
+              `Pulled ${loaded} / 8 files for Row r${activeRowIndex} (${ACTIVE_RIDERS_8[activeRowIndex].name}). Ready to train.`;
+          }
+        } catch (err) {
+          if (err?.name === "AbortError") {
+            setConnBadge(`LINK: CUT (Row r${activeRowIndex})`, true);
+          } else {
+            setConnBadge(`LINK: ERROR (Row r${activeRowIndex})`, true);
+            if (status) status.textContent = `Pull error: ${err?.message || err}`;
+          }
+        } finally {
+          activeAbortController = null;
+        }
+
+        return loaded;
+      };
+
+      g.syncActiveRowToDrive = async function () {
+        const status = document.getElementById("matrix-sync-status");
+        const gasUrl = getGasWebAppUrl();
+        if (!gasUrl) {
+          if (status) status.textContent = "Enter Google Script Web App URL before syncing.";
+          return [];
+        }
+
+        if (activeAbortController) {
+          try { activeAbortController.abort(); } catch (_) {}
+        }
+        activeAbortController = new AbortController();
+        const signal = activeAbortController.signal;
+
+        if (g.SoulAgent?.ready) {
+          const res = await g.SoulAgent.ready();
+          if (res?.data?.riders) syncManifestWithDataset(res.data.riders);
+          await g.SoulAgent.flushStorage?.();
+        }
+
+        const rowEntries = getRowManifest(activeRowIndex);
+        setConnBadge(`LINK: SYNCING ROW r${activeRowIndex}…`, false);
+
+        const results = [];
+        let savedCount = 0;
+
+        try {
+          for (let i = 0; i < rowEntries.length; i++) {
+            const entry = rowEntries[i];
+            if (status) {
+              status.textContent =
+                `Syncing Row r${activeRowIndex}: file ${i + 1} / 8 (${entry.file} [${entry.soulKey}]) → Drive…`;
+            }
+            const res = await saveMatchupMatrix(entry.p1, entry.p2, signal);
+            if (res?.ok !== false) savedCount++;
+            results.push({ key: entry.key, ok: true });
+          }
+
+          renderActiveRowGrid();
+          g.SoulTrainer?.refreshUI?.();
+
+          setConnBadge(`LINK: SYNCED (Row r${activeRowIndex})`, false);
+          if (status) {
+            status.textContent =
+              `Synced ${savedCount} / 8 files for Row r${activeRowIndex} to Google Drive. Click "3. Cut Connection & Purge Row RAM" before switching rows.`;
+          }
+        } catch (err) {
+          if (err?.name === "AbortError") {
+            setConnBadge(`LINK: CUT (Row r${activeRowIndex})`, true);
+          } else {
+            setConnBadge(`LINK: ERROR (Row r${activeRowIndex})`, true);
+            if (status) status.textContent = `Sync error: ${err?.message || err}`;
+          }
+        } finally {
+          activeAbortController = null;
+        }
+
+        return results;
+      };
+
       g.MatrixStorage = {
         GDRIVE_FOLDER_ID,
-        HARDCODED_64_MATRICES,
-        HARDCODED_49_MATRICES: HARDCODED_64_MATRICES,
         ACTIVE_RIDERS_8,
-        ACTIVE_RIDERS_7: ACTIVE_RIDERS_8,
         GOOGLE_APPS_SCRIPT_TEMPLATE,
         syncManifestWithDataset,
         resolveRiderIndex,
         getEntry,
+        getRowManifest,
         getGasWebAppUrl,
         setGasWebAppUrl,
         loadMatchupMatrix,
         saveMatchupMatrix
       };
+
+      if (g.SoulEnv?.setExecutionMode) {
+        g.SoulEnv.setExecutionMode("train");
+      }
+
+      const urlInput = document.getElementById("gas-webapp-url-input");
+      if (urlInput) {
+        urlInput.value = getGasWebAppUrl();
+      }
+
+      const codePre = document.getElementById("gas-script-code");
+      if (codePre) {
+        codePre.textContent = GOOGLE_APPS_SCRIPT_TEMPLATE;
+      }
     })(globalThis);
   </script>
 
@@ -534,240 +767,23 @@
   <script src="js/soul_agent.js?v=v5-state256-action17-charge1-reset1-v8"></script>
   <script src="js/ai.js?v=v5-state256-action17-charge1-reset1-v8"></script>
 
-  <!-- Initialize Train Mode (Live Search OFF by default) & 64-Matchup Matrix Pool UI -->
   <script>
     (function (g) {
       "use strict";
-
-      const NUM_RIDERS = 8;
-      const TOTAL_MATRICES = NUM_RIDERS * NUM_RIDERS; // 64
-
       if (g.SoulEnv?.setExecutionMode) {
         g.SoulEnv.setExecutionMode("train");
       }
-
-      if (g.SoulNN?.MatchupMatrixPool) {
-        g.MatchupPool = new g.SoulNN.MatchupMatrixPool({
-          sizes: g.SoulNN.COMPACT_MATCHUP_SIZES,
-          numRiders: NUM_RIDERS,
-          folderId: "15P5HeKqLxMYw3ykirJj2HMT726SZnkId"
-        });
-      }
-
-      function render64Grid() {
-        const gridEl = document.getElementById("matrix64-grid");
-        if (!gridEl) return;
-
-        const entries = Object.values(g.MATCHUP_64_MANIFEST);
-        let readyCount = 0;
-        let trainedCount = 0;
-
-        gridEl.innerHTML = entries.map(entry => {
-          let soulCand = null;
-          let soulAct = null;
-          try {
-            soulCand = g.SoulAgent?.getSection?.(entry.p1Id, entry.p2Id, "candidate") || null;
-            soulAct = g.SoulAgent?.getSection?.(entry.p1Id, entry.p2Id, "active") || null;
-          } catch (_) {}
-
-          const soulCp = soulCand || soulAct;
-          const inPool = g.MatchupPool?.learners?.has(entry.key);
-          const isReady = Boolean(soulCp) || inPool;
-
-          if (isReady) readyCount++;
-          if (soulCp && (soulCp.games || 0) > 0) trainedCount++;
-
-          const games = soulCp?.games || 0;
-          const steps = soulCp?.steps || (inPool ? g.MatchupPool.learners.get(entry.key).steps : 0);
-          const label = soulCp
-            ? `READY (${games}G)`
-            : isReady
-              ? `READY (${steps}S)`
-              : "INIT";
-
-          return `
-            <div class="matrix64-cell ${isReady ? "ready" : ""}"
-                 title="${entry.file} (${entry.p1Id} vs ${entry.p2Id} | Games: ${games}, Steps: ${steps})">
-              <div>${entry.key} (${entry.soulKey})</div>
-              <div>${label}</div>
-            </div>
-          `;
-        }).join("");
-
-        const countBadge = document.getElementById("matrix64-count-badge");
-        if (countBadge) {
-          countBadge.textContent = trainedCount > 0
-            ? `MATRICES: ${trainedCount} TRAINED / ${readyCount} ACTIVE`
-            : `MATRICES: ${readyCount} / ${TOTAL_MATRICES} ACTIVE`;
-        }
-      }
-
-      g.render64MatrixHeaderGrid = render64Grid;
-      g.render49MatrixHeaderGrid = render64Grid;
-
-      g.setTrainingExecutionMode = function (mode) {
-        const target = mode === "eval" ? "eval" : "train";
-        if (g.SoulEnv?.setExecutionMode) {
-          g.SoulEnv.setExecutionMode(target);
-        }
-        if (g.MatchupPool?.learners) {
-          for (const learner of g.MatchupPool.learners.values()) {
-            learner.setMode(target);
-          }
-        }
-        const badge = document.getElementById("matrix64-mode-badge");
-        if (badge) {
-          badge.textContent = target === "train"
-            ? "MODE: TRAIN (Live Search OFF)"
-            : "MODE: EVAL (Live Search ON)";
-        }
-        return target;
-      };
-
-      g.initAll64MatchupMatrices = function () {
-        if (!g.MatchupPool) return;
-        const mode = g.SoulEnv?.getExecutionMode?.() || "train";
-        for (let rA = 0; rA < NUM_RIDERS; rA++) {
-          for (let rB = 0; rB < NUM_RIDERS; rB++) {
-            g.MatchupPool.getOrCreateSync(rA, rB, mode, 1 + rA * NUM_RIDERS + rB);
-          }
-        }
-        render64Grid();
-        g.SoulTrainer?.refreshUI?.();
-        const status = document.getElementById("matrix64-sync-status");
-        if (status) {
-          status.textContent = `Initialized all ${TOTAL_MATRICES} matchup matrices in memory (preserving trained SoulAgent models).`;
-        }
-      };
-      g.initAll49MatchupMatrices = g.initAll64MatchupMatrices;
-
-      g.syncAll64MatricesToDrive = async function () {
-        const status = document.getElementById("matrix64-sync-status");
-        if (g.SoulAgent?.ready) {
-          const res = await g.SoulAgent.ready();
-          if (res?.data?.riders) g.MatrixStorage.syncManifestWithDataset(res.data.riders);
-          await g.SoulAgent.flushStorage?.();
-        }
-        g.initAll64MatchupMatrices();
-
-        const results = [];
-        let count = 0;
-        let savedCount = 0;
-        let trainedSyncedCount = 0;
-
-        for (let rA = 0; rA < NUM_RIDERS; rA++) {
-          for (let rB = 0; rB < NUM_RIDERS; rB++) {
-            count++;
-            const entry = g.MatrixStorage.getEntry(rA, rB);
-            const soulCp =
-              g.SoulAgent?.getSection?.(entry.p1Id, entry.p2Id, "candidate") ||
-              g.SoulAgent?.getSection?.(entry.p1Id, entry.p2Id, "active") ||
-              null;
-            const gamesTag = soulCp ? `${soulCp.games} games` : "0 games";
-
-            if (status) {
-              status.textContent = `Syncing ${count} / ${TOTAL_MATRICES} (${entry.key} [${entry.soulKey}] — ${gamesTag}) to Google Drive…`;
-            }
-
-            try {
-              const res = await g.MatchupPool.saveMatchup(rA, rB);
-              const ok = Boolean(res);
-              if (ok) {
-                savedCount++;
-                if (soulCp && (soulCp.games || 0) > 0) trainedSyncedCount++;
-              }
-              results.push({ key: entry.key, saved: ok, games: soulCp?.games || 0, result: res });
-            } catch (err) {
-              console.error(`Failed syncing ${entry.key}:`, err);
-              results.push({ key: entry.key, saved: false, error: err });
-            }
-          }
-        }
-
-        render64Grid();
-        g.SoulTrainer?.refreshUI?.();
-
-        if (status) {
-          status.textContent =
-            `Synced ${savedCount} / ${TOTAL_MATRICES} matrices (${trainedSyncedCount} trained SoulAgent checkpoints) to Google Drive (Folder: 15P5HeKqLxMYw3ykirJj2HMT726SZnkId).`;
-        }
-        return results;
-      };
-      g.syncAll49MatricesToDrive = g.syncAll64MatricesToDrive;
-
-      g.loadAll64MatricesFromDrive = async function () {
-        const status = document.getElementById("matrix64-sync-status");
-        if (g.SoulAgent?.ready) {
-          const res = await g.SoulAgent.ready();
-          if (res?.data?.riders) g.MatrixStorage.syncManifestWithDataset(res.data.riders);
-        }
-
-        const mode = g.SoulEnv?.getExecutionMode?.() || "train";
-        let count = 0;
-        let loaded = 0;
-        let importedSoulCount = 0;
-
-        for (let rA = 0; rA < NUM_RIDERS; rA++) {
-          for (let rB = 0; rB < NUM_RIDERS; rB++) {
-            count++;
-            const entry = g.MatrixStorage.getEntry(rA, rB);
-            if (status) {
-              status.textContent = `Loading ${count} / ${TOTAL_MATRICES} (${entry.key} [${entry.soulKey}]) from Google Drive…`;
-            }
-
-            const rawPayload = await g.MatrixStorage.loadMatchupMatrix(rA, rB);
-            if (rawPayload) {
-              loaded++;
-              if (typeof g.SoulAgent?.ingestDriveMatchup === "function") {
-                const ingestRes = g.SoulAgent.ingestDriveMatchup(rawPayload, entry.p1Id, entry.p2Id);
-                if (ingestRes.imported && ingestRes.games > 0) {
-                  importedSoulCount++;
-                }
-              }
-            }
-
-            // Ensure compact pool learner is also ready
-            g.MatchupPool.getOrCreateSync(rA, rB, mode, 1 + rA * NUM_RIDERS + rB);
-          }
-        }
-
-        if (g.SoulAgent?.flushStorage) {
-          await g.SoulAgent.flushStorage();
-        }
-
-        render64Grid();
-        g.SoulTrainer?.refreshUI?.();
-
-        if (status) {
-          status.textContent =
-            `Loaded ${loaded} / ${TOTAL_MATRICES} Drive files (${importedSoulCount} trained SoulAgent matchups restored into table).`;
-        }
-        return loaded;
-      };
-      g.loadAll49MatricesFromDrive = g.loadAll64MatricesFromDrive;
-
-      const urlInput = document.getElementById("gas-webapp-url-input");
-      if (urlInput) {
-        urlInput.value = g.MatrixStorage.getGasWebAppUrl();
-      }
-
-      const codePre = document.getElementById("gas-script-code");
-      if (codePre) {
-        codePre.textContent = g.MatrixStorage.GOOGLE_APPS_SCRIPT_TEMPLATE;
-      }
-
       if (g.SoulAgent?.ready) {
         g.SoulAgent.ready()
           .then(res => {
             if (res?.data?.riders) {
               g.MatrixStorage.syncManifestWithDataset(res.data.riders);
             }
-            render64Grid();
+            g.render64MatrixHeaderGrid?.();
           })
           .catch(() => {});
       }
-
-      render64Grid();
+      g.render64MatrixHeaderGrid?.();
     })(globalThis);
   </script>
 
