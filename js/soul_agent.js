@@ -1096,20 +1096,25 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       checkpoint: resolvedCheckpoint
     };
   }
+const attemptedRepoKeys = new Set();
 
   /**
-- Fetches the exact 1v1 matchup file from `data/matrix/matrix_r{learner}_vs_r{opponent}.json`
-- (with fallbacks to `data/matrix_r{learner}_vs_r{opponent}.json`)
-- and returns the validated checkpoint object for `ai_worker.js` and `KF_AI.choose()`.
+   * Fetches the exact 1v1 matchup file from `data/matrix/matrix_r{learner}_vs_r{opponent}.json`
+   * (with fallbacks to `data/matrix_r{learner}_vs_r{opponent}.json`)
+   * and returns the validated checkpoint object for `ai_worker.js` and `KF_AI.choose()`.
    */
   async function fetchMatchupFromCDN(learner, opponent) {
     assertRuntime();
+
+    const key = getCanonicalKey(learner, opponent);
+    attemptedRepoKeys.add(key);
 
     const candidates = matchupMatrixURLs(learner, opponent);
 
     for (const { url, label } of candidates) {
       try {
         const response = await fetch(url, { cache: "no-store" });
+        if (response.status === 404) break;
         if (!response.ok) continue;
 
         const payload = await response.json();
@@ -1183,38 +1188,60 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
 
     let found = 0;
     const activeCodes = getActiveCodes();
-    const jobs = [];
+    const pairs = [];
 
     for (const learnerCode of activeCodes) {
       for (const oppCode of activeCodes) {
-        jobs.push(
-          (async () => {
-            const candidates = matchupMatrixURLs(learnerCode, oppCode);
-            for (const { url, label } of candidates) {
-              try {
-                const response = await fetch(url, { cache: "no-store" });
-                if (!response.ok) continue;
-
-                const payload = await response.json();
-                const res = ingestDriveMatchup(payload, learnerCode, oppCode);
-                if (res.imported) {
-                  if (res.checkpoint) {
-                    res.checkpoint.matrixFile = label;
-                  }
-                  found++;
-                  return;
-                }
-              } catch (_) {
-                // Missing/offline matrix files do not block startup
-              }
-            }
-          })()
-        );
+        pairs.push([learnerCode, oppCode]);
       }
     }
 
-    await Promise.all(jobs);
+    // Batch requests (8 at a time) so GitHub Pages is not flooded on startup
+    const CONCURRENCY = 8;
+    let cursor = 0;
+
+    async function worker() {
+      while (cursor < pairs.length) {
+        const [learnerCode, oppCode] = pairs[cursor++];
+        const key = `${learnerCode}_${oppCode}`;
+        attemptedRepoKeys.add(key);
+
+        const candidates = matchupMatrixURLs(learnerCode, oppCode);
+        for (const { url, label } of candidates) {
+          try {
+            const response = await fetch(url, { cache: "no-store" });
+            if (response.status === 404) break;
+            if (!response.ok) continue;
+
+            const payload = await response.json();
+            const res = ingestDriveMatchup(payload, learnerCode, oppCode);
+            if (res.imported) {
+              if (res.checkpoint) {
+                res.checkpoint.matrixFile = label;
+              }
+              found++;
+            }
+            break;
+          } catch (_) {
+            // Missing/offline matrix files do not block startup
+          }
+        }
+      }
+    }
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, pairs.length) }, () => worker())
+    );
+
     saveToLocalStorage();
+    await flushStorage();
+
+    if (typeof g.SoulTrainer?.syncHeaderPool === "function") {
+      g.SoulTrainer.syncHeaderPool();
+    } else if (typeof g.SoulTrainer?.refreshUI === "function") {
+      g.SoulTrainer.refreshUI();
+    }
+
     return found;
   }
 
@@ -1226,19 +1253,27 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
         if (typeof g.KF?.loadData === "function") {
           try {
             cachedData = await g.KF.loadData();
-            if (Array.isArray(cachedData?.riders)) {
-              syncRosterCodes(cachedData.riders);
-            }
-          } catch (_) {}
+          } catch (err) {
+            throw new Error(
+              "Failed to load combat data (riders/moves): " +
+              (err?.message || String(err))
+            );
+          }
+          if (Array.isArray(cachedData?.riders)) {
+            syncRosterCodes(cachedData.riders);
+          }
         }
 
-        // 1. Load local checkpoints from LocalStorage + IndexedDB first
+        if (!cachedData || !Array.isArray(cachedData.riders) || cachedData.riders.length === 0) {
+          throw new Error("Combat dataset is empty or missing riders.");
+        }
+
+        // 1. Load local checkpoints from LocalStorage + IndexedDB immediately
         loadFromLocalStorage();
         await loadFromIndexedDB();
 
-        // 2. Scan all `data/matrix/matrix_rA_vs_rB.json` files
-        await scanAllMatchupsFromRepo();
-        await flushStorage();
+        // 2. Scan `data/matrix/matrix_rA_vs_rB.json` in background without blocking UI init
+        scanAllMatchupsFromRepo().catch(() => {});
 
         return { data: cachedData };
       })().catch(error => {
@@ -1273,8 +1308,8 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       (target === "active" ? store.candidate.matchups[key] : null) ||
       null;
 
-    if (!match) {
-      // Trigger non-blocking background fetch so the store is populated immediately if not yet loaded
+    if (!match && !attemptedRepoKeys.has(key)) {
+      attemptedRepoKeys.add(key);
       fetchMatchupFromCDN(learner, opponent).catch(() => {});
     }
 
@@ -1768,7 +1803,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
     status
   };
 
-  // Auto-preload all `data/matrix/matrix_rX_vs_rY.json` files on the main thread
+  // Auto-preload on main thread without blocking UI initialization
   if (typeof document !== "undefined") {
     loadFromLocalStorage();
     setTimeout(() => {
