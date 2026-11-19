@@ -1,6 +1,6 @@
 /* js/training_ui.js
 - Build: v5-state256-action17
-- Matrix: v8-8riders-9backup (64-Matrix Bidirectional Header Drive Sync Edition)
+- Matrix: v8-8riders-9backup (Row-Isolated 8-File Drive Sync Edition)
 - Patch: charge1-reset1
  */
 (function (g) {
@@ -13,8 +13,6 @@
   const EXPECTED_SCHEMA =
     "kf-state256-action17-v2-charge1-reset1";
 
-  // Minimum interval (ms) between heavy IndexedDB/localStorage writes during live training.
-  // Checkpoints are always buffered in RAM and 100% flushed on stop/done.
   const CHECKPOINT_SAVE_THROTTLE_MS = 5000;
 
   let initialized = false;
@@ -36,26 +34,24 @@
     host.classList.add("soul-tools");
 
     host.innerHTML = `
-      <h2>KAMEN FIGHT — v8 RIDER MATRIX TRAINER (64 MATCHUPS + 9 BACKUP SLOTS)</h2>
+      <h2>KAMEN FIGHT — v8 RIDER MATRIX TRAINER (ROW-ISOLATED 8×8)</h2>
 
       <p>
         Build: <strong>${BUILD}</strong> |
-        Matrix: <strong>64-Matchup Matrix (8×8 Riders, Header Drive Sync + IndexedDB)</strong> |
+        Matrix: <strong>Row-Isolated Mode (1 Rider Row = 8 Matchups at a time)</strong> |
         Patch: <strong>${PATCH}</strong><br>
-        256 inputs / 17 actions (42,257 params/matchup | 338,056 params/Rider | 9 backup slots reserved).
+        256 inputs / 17 actions (42,257 params/matchup | 8 matchups/row | 9 backup slots reserved).
       </p>
 
       <p>
-        Turn-based decision picking with an 8-second charge action bar (1–100%).
-        Selecting a different direction resets charging to 1%.
-        Repeating the same direction preserves its charge clock.
-        Training against <strong>ALL OPPONENTS</strong> cycles across 001..008
-        with isolated networks and replay buffers (zero cross-matchup weight pollution).
-        Use the <strong>Top Header Panel</strong> to Import/Export all 64 matrices to and from Google Drive.
+        Workflow: <strong>1. Pull Row (8 Files) ← Drive</strong> →
+        <strong>2. Train / Evaluate Row</strong> →
+        <strong>3. Sync Row (8 Files) → Drive</strong> →
+        <strong>4. Cut Connection & Purge Row RAM</strong> before switching to the next Rider row.
       </p>
 
       <div class="soul-fields">
-        <label>Learner (Rider)
+        <label>Learner (Active Row)
           <select data-field="learner"></select>
         </label>
 
@@ -65,7 +61,7 @@
 
         <label>Opponent controller
           <select data-field="mode">
-            <option value="mixed">MIXED — 30 each of Tree-hopper / Cricket / Beetle / Bullet Ant cycle</option>
+            <option value="mixed">MIXED — Tree-hopper / Cricket / Beetle / Bullet Ant cycle</option>
             <option value="easy">Tree-hopper — Level 1 (Novice)</option>
             <option value="balanced">Cricket — Level 2 (Balance)</option>
             <option value="defensive">Beetle — Level 3 (Defensive)</option>
@@ -140,8 +136,8 @@
       </div>
 
       <div class="soul-buttons">
-        <button type="button" data-action="train">TRAIN / RESUME</button>
-        <button type="button" data-action="warm">GUIDED WARM-START</button>
+        <button type="button" data-action="train">TRAIN / RESUME ROW</button>
+        <button type="button" data-action="warm">GUIDED WARM-START ROW</button>
         <button type="button" data-action="eval-candidate">EVALUATE CANDIDATE</button>
         <button type="button" data-action="eval-active">EVALUATE ACTIVE</button>
         <button type="button" data-action="promote">ACTIVATE CANDIDATE(S)</button>
@@ -180,10 +176,6 @@
 
         .soul-tools h2 {
           color: #00ffcc;
-        }
-
-        .soul-warning {
-          color: #ffd68a;
         }
 
         .soul-fields,
@@ -264,11 +256,9 @@
     let worker = null;
     let stopping = false;
 
-    // Cache for static "First 4 Winning Games" move logs
     let cachedWinsKey = "";
     let cachedWinsBlock = "";
 
-    // In-memory checkpoint buffer for throttled persistence
     const pendingCheckpoints = new Map();
     let lastCheckpointSaveTime = 0;
 
@@ -283,101 +273,47 @@
       };
     }
 
-    // =========================================================================
-    // 64-MATRIX HEADER PANEL <-> SOULAGENT BIDIRECTIONAL BRIDGE
-    // =========================================================================
-
-    function getHeaderRamPool() {
-      const pool = g.__KF_MATRIX64_RAM__ || g.__KF_MATRIX49_RAM__ || {};
-      g.__KF_MATRIX64_RAM__ = pool;
-      g.__KF_MATRIX49_RAM__ = pool;
-      return pool;
-    }
-
     function triggerHeaderGridRender() {
       if (typeof g.render64MatrixHeaderGrid === "function") {
         g.render64MatrixHeaderGrid();
-      } else if (typeof g.render49MatrixHeaderGrid === "function") {
-        g.render49MatrixHeaderGrid();
       }
     }
 
-    function getMaxRosterCapacity() {
-      const activeCount = g.SoulAgent?.getActiveCodes?.()?.length || 0;
-      const dataCount = data?.riders?.length || 0;
-      return Math.max(8, activeCount, dataCount);
+    function syncHeaderRowDropdown(learnerId) {
+      if (!data || !Array.isArray(data.riders)) return;
+      const idx = data.riders.findIndex(r => r.id === learnerId);
+      if (idx >= 0 && typeof g.switchActiveMatrixRow === "function") {
+        if (g.getActiveMatrixRowIndex?.() !== idx) {
+          g.switchActiveMatrixRow(idx, true);
+        }
+      }
     }
 
-    function syncToHeaderPool(cp, selectedLearner) {
-      if (!cp || !g.SoulAgent) return;
-      try {
-        const lCode = g.SoulAgent.toCode(cp.learnerId || selectedLearner);
-        const oCode = g.SoulAgent.toCode(cp.opponentId);
-        const p1Idx = parseInt(lCode, 10) - 1;
-        const p2Idx = parseInt(oCode, 10) - 1;
-        const maxRiders = getMaxRosterCapacity();
+    function syncRowSummaryToHeader(learnerId) {
+      if (!data || !g.SoulAgent || !learnerId) return;
+      const ramPool = (g.__KF_MATRIX64_RAM__ = g.__KF_MATRIX49_RAM__ = g.__KF_MATRIX64_RAM__ || {});
+      const lCode = g.SoulAgent.toCode(learnerId);
+      const p1Idx = parseInt(lCode, 10) - 1;
 
-        if (
-          Number.isInteger(p1Idx) && p1Idx >= 0 && p1Idx < maxRiders &&
-          Number.isInteger(p2Idx) && p2Idx >= 0 && p2Idx < maxRiders
-        ) {
-          const mId = `r${p1Idx}_vs_r${p2Idx}`;
-          const ramPool = getHeaderRamPool();
+      for (let j = 0; j < data.riders.length && j < 8; j++) {
+        const oppId = data.riders[j].id;
+        const oCode = g.SoulAgent.toCode(oppId);
+        const soulBest =
+          g.SoulAgent.getSection(learnerId, oppId, "candidate") ||
+          g.SoulAgent.getSection(learnerId, oppId, "active");
+
+        if (soulBest && p1Idx >= 0 && p1Idx < 8) {
+          const mId = `r${p1Idx}_vs_r${j}`;
           ramPool[mId] = {
-            ...(ramPool[mId] || {}),
             matchupKey: mId,
             canonicalKey: `${lCode}_${oCode}`,
-            p1Rider: cp.learnerId || selectedLearner,
-            p2Rider: cp.opponentId,
-            games: cp.games || 0,
-            steps: cp.steps || 0,
-            soulCandidate: cp,
-            updatedAt: new Date().toISOString()
+            games: soulBest.games || 0,
+            steps: soulBest.steps || 0
           };
-        }
-
-        triggerHeaderGridRender();
-      } catch (err) {
-        console.warn("[Training UI] Header pool sync warning:", err);
-      }
-    }
-
-    function syncWithHeaderPool() {
-      if (!data || !g.SoulAgent) {
-        return { imported: 0, exported: 0, initialized: 0 };
-      }
-
-      let imported = 0;
-      let exported = 0;
-      const ramPool = getHeaderRamPool();
-      const maxRiders = getMaxRosterCapacity();
-
-      for (let i = 0; i < data.riders.length && i < maxRiders; i++) {
-        for (let j = 0; j < data.riders.length && j < maxRiders; j++) {
-          const learnerId = data.riders[i].id;
-          const opponentId = data.riders[j].id;
-          const mId = `r${i}_vs_r${j}`;
-
-          const ramEntry = ramPool[mId];
-          if (ramEntry && typeof g.SoulAgent.ingestDriveMatchup === "function") {
-            const res = g.SoulAgent.ingestDriveMatchup(ramEntry, learnerId, opponentId);
-            if (res.imported) imported++;
-          }
-
-          const soulCand = g.SoulAgent.getSection(learnerId, opponentId, "candidate");
-          const soulAct = g.SoulAgent.getSection(learnerId, opponentId, "active");
-          const soulBest = soulCand || soulAct;
-
-          if (soulBest) {
-            syncToHeaderPool(soulBest, learnerId);
-            exported++;
-          }
         }
       }
 
       triggerHeaderGridRender();
-
-      return { imported, exported, initialized: 0 };
     }
 
     function flushPendingCheckpoints(selectedLearner) {
@@ -395,11 +331,11 @@
         }
 
         g.SoulAgent.setCandidate(cp);
-        syncToHeaderPool(cp, selectedLearner);
       }
 
       pendingCheckpoints.clear();
       lastCheckpointSaveTime = performance.now();
+      syncRowSummaryToHeader(selectedLearner);
       return true;
     }
 
@@ -453,12 +389,12 @@
       const lines = [
         validSelection
           ? isMulti
-            ? `Selected Learner: Rider ${learnerCode} (${learnerCode}_001 .. ${learnerCode}_${lastCode} Auto-Cycle + 9 backup slots)`
-            : `Selected Matchup: ${agent.getCanonicalKey(selected.learner, selected.opponent)}`
+            ? `Active Row: Rider ${learnerCode} (${learnerCode}_001 .. ${learnerCode}_${lastCode} — 8 matchups in row)`
+            : `Selected Cell: ${agent.getCanonicalKey(selected.learner, selected.opponent)}`
           : "Loading matchup data…",
 
         isMulti
-          ? `Rider ${learnerCode} Candidate Matchups: ${candCount} / ${codes.length} active matchups populated`
+          ? `Row ${learnerCode} Candidate Matchups: ${candCount} / ${codes.length} populated`
           : `Candidate: ${
               candidate
                 ? `${candidate.games} games / ${candidate.steps} accepted decisions`
@@ -466,7 +402,7 @@
             }`,
 
         isMulti
-          ? `Rider ${learnerCode} Active Matchups: ${actCount} / ${codes.length} active matchups populated`
+          ? `Row ${learnerCode} Active Matchups: ${actCount} / ${codes.length} populated`
           : `Active: ${
               active
                 ? `${active.games} games / ${active.steps} accepted decisions`
@@ -477,30 +413,28 @@
         ...(status.warnings || [])
       ].filter(Boolean);
 
-      if (data && agent) {
-        lines.push("", `CANDIDATE MATCHUP MATRIX (${codes.length}x${codes.length} = ${codes.length * codes.length} ACTIVE + 9 BACKUP SLOTS)`);
+      if (data && agent && validSelection) {
+        lines.push("", `ACTIVE ROW ${learnerCode} MATRIX (${codes.length} MATCHUPS + 9 BACKUP SLOTS)`);
+        lines.push("     " + codes.map(code => code.padStart(7)).join(" "));
 
-        const matrix = agent.getMatchupBreakdown("candidate");
+        const candRow = codes.map(oppCode => {
+          const entry = learnerCandidateMap[`${learnerCode}_${oppCode}`];
+          if (!entry) return "-".padStart(7);
+          const tag = entry.evaluated ? `${entry.games}*` : String(entry.games);
+          return tag.padStart(7);
+        }).join(" ");
 
-        lines.push(
-          "     " + codes.map(code => code.padStart(7)).join(" ")
-        );
+        const actRow = codes.map(oppCode => {
+          const entry = learnerActiveMap[`${learnerCode}_${oppCode}`];
+          if (!entry) return "-".padStart(7);
+          return String(entry.games).padStart(7);
+        }).join(" ");
 
-        for (const code of codes) {
-          lines.push(
-            code + "  " +
-            codes.map(opponent => {
-              const entry = matrix[code]?.[opponent];
-              if (!entry || !entry.hasModel) return "-".padStart(7);
-              const tag = entry.evaluated ? `${entry.games}*` : String(entry.games);
-              return tag.padStart(7);
-            }).join(" ")
-          );
-        }
+        lines.push(`CAND ${candRow}`);
+        lines.push(`ACTV ${actRow}`);
       }
 
       statusEl.textContent = lines.join("\n");
-
       triggerHeaderGridRender();
 
       return {
@@ -714,36 +648,13 @@
               ? "ENABLED — losses/draws discarded"
               : "DISABLED — all matches update"
           }`,
-
-          `Guidance probability: ${
-            (100 * report.guideProbability).toFixed(1)
-          }%${
-            Number.isFinite(report.guidePct) && !report.warmStart
-              ? ` (Input: ${report.guidePct}%)`
-              : ""
-          }`,
-
-          `Scheduled epsilon: ${
-            (100 * report.epsilon).toFixed(1)
-          }% (Initial: ${report.initialEpsilon}%)`,
-
-          `Imitation coefficient: ${
-            report.imitationCoefficient.toFixed(4)
-          }`,
-
-          `Replay entries (isolated per matchup): ${report.replaySize}`,
+          `Guidance probability: ${(100 * report.guideProbability).toFixed(1)}%`,
+          `Scheduled epsilon: ${(100 * report.epsilon).toFixed(1)}% (Initial: ${report.initialEpsilon}%)`,
+          `Imitation coefficient: ${report.imitationCoefficient.toFixed(4)}`,
+          `Active learner replay entries: ${report.replaySize}`,
           `Gradient updates: ${report.updates}`,
           `Latest combined training loss: ${report.loss.toFixed(6)}`
         );
-
-        if (report.updateStats) {
-          const s = report.updateStats;
-
-          lines.push(
-            "Replay samples used — Win/Dmg/Loss/Other: " +
-            `${s.win}/${s.damage}/${s.loss}/${s.neutral}`
-          );
-        }
       } else {
         lines.push(
           "",
@@ -751,57 +662,6 @@
           `Loaded fingerprint: ${report.loadedWeightsID}`,
           "No gradient updates or epsilon exploration."
         );
-      }
-
-      if (report.matchParameters) {
-        const mp = report.matchParameters;
-        lines.push(
-          "",
-          "MATCH PARAMETER TELEMETRY (ACTIVE CONTEXT + 9 RESERVED SLOTS)",
-          `  Avg Final LP (Own / Opp): ${(100 * mp.avgFinalLpRatio).toFixed(1)}% / ${(100 * mp.avgEnemyFinalLpRatio).toFixed(1)}%`,
-          `  Avg Damage (Dealt / Taken): ${(100 * mp.avgDamageDealtRatio).toFixed(1)}% / ${(100 * mp.avgDamageTakenRatio).toFixed(1)}%`,
-          `  Avg Chi/Round (Earned / Spent / NetAdv): ${mp.avgChiEarned.toFixed(2)} / ${mp.avgChiSpent.toFixed(2)} / ${mp.avgNetChiAdvantage.toFixed(2)}`,
-          `  Avg Execution Charge: ${mp.avgExecutionCharge.toFixed(1)}% | Priority Win Rate: ${(100 * mp.priorityWinRate).toFixed(1)}%`,
-          `  S-Move Rate: ${(100 * mp.sMoveUsageRate).toFixed(1)}% | A-Guard Counter Rate: ${(100 * mp.aGuardSuccessRate).toFixed(1)}%`,
-          `  W-Buff Rate: ${(100 * mp.wBuffCastRate).toFixed(1)}% | Evasion Trigger Rate: ${(100 * mp.evasionTriggerRate).toFixed(1)}%`,
-          `  Faint Rate (Inflicted / Suffered): ${(100 * mp.faintInflictedRate).toFixed(1)}% / ${(100 * mp.faintSufferedRate).toFixed(1)}%`,
-          `  Reserved Parameter Slots: [${(mp.reservedSlots || []).length} backup slots ready]`
-        );
-      }
-
-      const counts = report.wasdRatio?.counts;
-
-      if (counts) {
-        const total = Math.max(
-          1,
-          Object.values(counts).reduce(
-            (sum, value) => sum + value,
-            0
-          )
-        );
-
-        lines.push(
-          "",
-          "ROUND ACTION USAGE — includes forced recovery"
-        );
-
-        for (const [stance, count] of Object.entries(counts)) {
-          lines.push(
-            `${stance.padEnd(4)} ${String(count).padStart(7)} ` +
-            `${(100 * count / total).toFixed(1)}%`
-          );
-        }
-
-        lines.push("", "STANCE: J / K / I / L / NONE");
-
-        for (const [stance, row] of Object.entries(
-          report.moveBreakdown?.moveMatrix || {}
-        )) {
-          lines.push(
-            `${stance}: ${row.J} / ${row.K} / ${row.I} / ` +
-            `${row.L} / ${row.NONE}`
-          );
-        }
       }
 
       lines.push("", "BREAKDOWN");
@@ -823,11 +683,7 @@
       }
 
       if (report.cancelled) {
-        lines.push(
-          "",
-          "STOPPED — partial job.",
-          "Decision totals may include an unfinished match."
-        );
+        lines.push("", "STOPPED — partial job.");
       } else if (stopping) {
         lines.push("", "Stop requested; waiting for the worker.");
       }
@@ -1005,7 +861,7 @@
       busy = true;
       stopping = false;
       refresh();
-      output("Starting worker…");
+      output("Starting sequential row worker…");
 
       try {
         const url = new URL(
@@ -1084,14 +940,14 @@
                 report.games === report.requested
               ) {
                 g.SoulAgent.recordEvaluation(target, report);
-                syncWithHeaderPool();
+                syncRowSummaryToHeader(selected.learner);
               }
 
               output(
                 formatReport(report) +
                 (
                   training
-                    ? "\n\nCandidate matchup(s) saved to IndexedDB and synced to the 64-Matrix Header Panel."
+                    ? "\n\nRow candidate matchup(s) saved. Click '2. Sync Row (8 Files) → Drive' in the Top Bar, then '3. Cut Connection & Purge Row RAM'."
                     : report.cancelled
                       ? "\n\nIncomplete evaluation was not recorded for activation."
                       : "\n\nEvaluation finished and recorded."
@@ -1119,7 +975,12 @@
       }
     }
 
-    field("learner").addEventListener("change", refresh);
+    field("learner").addEventListener("change", () => {
+      syncHeaderRowDropdown(field("learner").value);
+      syncRowSummaryToHeader(field("learner").value);
+      refresh();
+    });
+
     field("opponent").addEventListener("change", refresh);
 
     if (!dedicated) {
@@ -1181,7 +1042,7 @@
               selected.opponent
             );
 
-            syncWithHeaderPool();
+            syncRowSummaryToHeader(selected.learner);
             refresh();
 
             output(
@@ -1239,10 +1100,26 @@
         refresh();
       },
 
-      syncHeaderPool(options) {
-        const res = syncWithHeaderPool(options);
+      setLearnerId(riderId) {
+        const select = field("learner");
+        if (select && select.value !== riderId) {
+          select.value = riderId;
+          syncRowSummaryToHeader(riderId);
+          refresh();
+        }
+      },
+
+      disconnectAndPurge() {
+        if (worker) {
+          try { worker.terminate(); } catch (_) {}
+          worker = null;
+        }
+        busy = false;
+        stopping = false;
+        pendingCheckpoints.clear();
+        cachedWinsKey = "";
+        cachedWinsBlock = "";
         refresh();
-        return res;
       }
     };
 
@@ -1266,7 +1143,7 @@
 
       const allOption = document.createElement("option");
       allOption.value = "*";
-      allOption.textContent = `ALL OPPONENTS [001–${lastCode} Auto-Cycle]`;
+      allOption.textContent = `ALL OPPONENTS IN ROW [001–${lastCode} Sequential]`;
       field("opponent").appendChild(allOption);
 
       for (const rider of data.riders) {
@@ -1281,16 +1158,18 @@
         }
       }
 
-      field("learner").value = data.riders[0].id;
+      const initialRowIdx = g.getActiveMatrixRowIndex?.() || 0;
+      const initialRider = data.riders[initialRowIdx] || data.riders[0];
+      field("learner").value = initialRider.id;
       field("opponent").value = "*";
 
-      const syncStats = syncWithHeaderPool();
+      syncRowSummaryToHeader(initialRider.id);
 
       output(
-        "Ready (v8 64-Matrix Mode — IndexedDB + Google Drive Sync).\n" +
-        `Header Pool <-> SoulAgent Synced (Imported: ${syncStats.imported}, Preserved: ${syncStats.exported}).\n` +
-        "Select ALL OPPONENTS to auto-cycle training across all 8 Riders with isolated matchup networks.\n" +
-        "Use the Top Header Panel to Import/Export all 64 matrices to and from Google Drive."
+        `Ready (Row r${initialRowIdx}: ${initialRider.name} — 8 matchups in row).\n` +
+        "Step 1: Click '1. Pull Row (8 Files) ← Drive' to load this row.\n" +
+        "Step 2: Click 'TRAIN / RESUME ROW' or 'GUIDED WARM-START ROW'.\n" +
+        "Step 3: Click '2. Sync Row (8 Files) → Drive', then '3. Cut Connection & Purge Row RAM' before switching rows."
       );
     } catch (error) {
       data = null;
