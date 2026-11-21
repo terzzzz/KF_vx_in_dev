@@ -86,6 +86,6 @@
     "icon": "assets/images/icons/skyrider.png",
     "videoFolder": "assets/videos/skyrider/",
     "finisher": "Three-Point Drop / Sky Kick",
-    "active": true
+    "active": false
   }
 ]
