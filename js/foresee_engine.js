@@ -376,12 +376,10 @@
       return false;
     }
     const { minSCost, sKeys } = getMovesetMeta(moves);
-    if (Number(fighter.chi || 0) < minSCost) {
+    if (sKeys.length === 0 || Number(fighter.chi || 0) < minSCost) {
       return false;
     }
-    if (!dirConstraints) {
-      return sKeys.length > 0;
-    }
+    // Always verify per-move legality (handles Stronger's enableSpecials & Skyrider's requiresAirborne)
     for (let i = 0; i < sKeys.length; i++) {
       if (canUseMoveKey(state, slot, sKeys[i], dirConstraints)) {
         return true;
@@ -712,7 +710,11 @@
     const oppChi = Number(enemy.chi || 0);
     const oppMinS = minSChiCost(state, enemySlot);
     const oppMaxLp = Math.max(1, Number(enemy.maxLp || 1600));
-    const oppLpRatio = Number(enemy.lp || 0) / oppMaxLp;
+    const oppDmgTakenMult = Math.max(
+      1,
+      Number(C.modifiers(enemy)?.damageTakenMult || 1)
+    );
+    const oppLpRatio = (Number(enemy.lp || 0) / oppDmgTakenMult) / oppMaxLp;
 
     // Rule 2: Faint > 75% combined with Opponent Chi threat check
     const highFaintRisk =
@@ -837,6 +839,7 @@
     }
 
     const maxLp = Math.max(1, Number(player.maxLp || 1600));
+    const maxChi = Math.max(1, Number(player.maxChi || 16));
     let units = 0;
 
     if (buffs) {
@@ -847,6 +850,9 @@
         const eff = buff.effects || {};
         const durScale = 0.55 + 0.25 * rounds;
 
+        if (buff.enableSpecials || eff.enableSpecials) {
+          units += 0.95 * Math.min(1.6, 0.75 + 0.15 * rounds);
+        }
         if (Number(eff.evasion) > 0) {
           units += Number(eff.evasion) * 1.25 * durScale;
         }
@@ -870,6 +876,21 @@
         if (eff.armor !== undefined && Number(eff.armor) < 1) {
           units += (1 - Number(eff.armor)) * 0.90 * durScale;
         }
+        const damageTakenMult =
+          eff.damageTakenMult !== undefined
+            ? Number(eff.damageTakenMult)
+            : buff.damageTakenMult !== undefined
+              ? Number(buff.damageTakenMult)
+              : 1;
+        if (Number.isFinite(damageTakenMult) && damageTakenMult !== 1) {
+          units -= (damageTakenMult - 1) * 0.90 * durScale;
+        }
+        const chiDrainOnHit = Number(
+          buff.chiDrainOnHit ?? eff.chiDrainOnHit ?? 0
+        );
+        if (chiDrainOnHit > 0) {
+          units += (chiDrainOnHit / maxChi) * 1.50 * durScale;
+        }
         if (eff.speed !== undefined && Number(eff.speed) !== 1) {
           units += (Number(eff.speed) - 1) * 0.60 * durScale;
         }
@@ -877,7 +898,8 @@
     }
 
     if (airTicks > 0) {
-      units += 0.20 * Math.min(2, airTicks);
+      const airBonus = Number(player.chi || 0) >= 5 ? 0.42 : 0.28;
+      units += airBonus * Math.min(2, airTicks);
     }
 
     return K.clamp(units, -2.5, 2.5);
@@ -909,8 +931,8 @@
     const ownMinS = ownMeta.minSCost;
     const enemyMinS = enemyMeta.minSCost;
 
-    const ownHasS = !own.isFainted && ownChi >= ownMinS && ownMeta.sKeys.length > 0;
-    const enemyHasS = !enemy.isFainted && enemyChi >= enemyMinS && enemyMeta.sKeys.length > 0;
+    const ownHasS = canUseSMove(state, slot);
+    const enemyHasS = canUseSMove(state, enemySlot);
 
     let score = 0;
 
@@ -967,6 +989,8 @@
    * - Faint infliction (+32) / Faint suffered (-36)
    * - Clean Guard & Omni-Guard vs S / Offensive bonus
    * - Beetle's 2.2x CHI weighting when myCHI < oppCHI
+   * - armor_break (damageTakenMult) application & offensive cash-out synergy
+   * - chiDrainOnHit realized Chi-strip pressure
    */
   function evaluateTransitionTactics(
     before,
@@ -1029,6 +1053,42 @@
     }
     if (!beforeOwn.isFainted && afterOwn.isFainted) {
       tacticalDelta -= 36;
+    }
+
+    // armor_break (damageTakenMult) application & offensive follow-up synergy
+    const beforeOwnMods = C.modifiers(beforeOwn);
+    const afterOwnMods = C.modifiers(afterOwn);
+    const beforeEnemyMods = C.modifiers(beforeEnemy);
+    const afterEnemyMods = C.modifiers(afterEnemy);
+
+    const beforeEnemyDmgTaken = Number(beforeEnemyMods?.damageTakenMult || 1);
+    const afterEnemyDmgTaken = Number(afterEnemyMods?.damageTakenMult || 1);
+    const beforeOwnDmgTaken = Number(beforeOwnMods?.damageTakenMult || 1);
+    const afterOwnDmgTaken = Number(afterOwnMods?.damageTakenMult || 1);
+
+    if (afterEnemyDmgTaken > beforeEnemyDmgTaken + 0.01) {
+      tacticalDelta += 14 * (afterEnemyDmgTaken - beforeEnemyDmgTaken);
+    }
+    if (afterOwnDmgTaken > beforeOwnDmgTaken + 0.01) {
+      tacticalDelta -= 16 * (afterOwnDmgTaken - beforeOwnDmgTaken);
+    }
+    if (beforeEnemyDmgTaken > 1.01 && ownMove?.offensive && enemyLpDelta < 0) {
+      tacticalDelta += 10 * Math.min(0.6, beforeEnemyDmgTaken - 1);
+    }
+
+    // Realized chiDrainOnHit pressure when our offensive hit lands
+    const ownChiDrainOnHit = Number(beforeOwnMods?.chiDrainOnHit || 0);
+    if (
+      ownChiDrainOnHit > 0 &&
+      ownMove?.offensive &&
+      enemyLpDelta < 0 &&
+      enemyChiDelta < 0
+    ) {
+      tacticalDelta += 5.5 * Math.min(4, Math.abs(enemyChiDelta));
+      const enemyMinS = minSChiCost(before, enemySlot);
+      if (beforeEnemy.chi >= enemyMinS && afterEnemy.chi < enemyMinS) {
+        tacticalDelta += 14;
+      }
     }
 
     // Case 1: We used a matching guard (or Omni Guard) against opponent's S move and won Chi without losing LP
@@ -1772,10 +1832,10 @@
 
     const observed = obsPair.own;
     const otherObserved = obsPair.other;
-    const { keys, minSCost } = getMovesetMeta(moves);
+    const { keys } = getMovesetMeta(moves);
     const otherMeta = getMovesetMeta(state.moves?.[otherSlot]);
-    const otherCanUseS = !otherIsFainted && otherChi >= otherMeta.minSCost && otherMeta.sKeys.length > 0;
-    const ownCanUseS = ownChi >= minSCost;
+    const otherCanUseS = !otherIsFainted && canUseSMove(state, otherSlot);
+    const ownCanUseS = canUseSMove(state, slot);
     const otherCanUseAI = !otherIsFainted && otherMeta.omniKeys.length > 0;
 
     const entries = [];
@@ -2460,6 +2520,7 @@
     const enemyCanUseS = canUseSMove(state, opponentSlot, oppConstraints);
     const ownCanUseS = canUseSMove(state, slot, selfConstraints);
     const ownCanUseOmni = canUseOmniGuard(state, slot, selfConstraints);
+    const ownOmniKey = getMovesetMeta(state.moves?.[slot]).omniKeys[0] || "A+I";
 
     if (
       Array.isArray(candidates) &&
@@ -2586,8 +2647,18 @@
       ? [...rawAdvisedKeys]
       : [];
 
-    if (isSmartDifficulty && enemyCanUseS && ownCanUseOmni && !advisedKeys.includes("A+I")) {
-      advisedKeys.unshift("A+I");
+    const rootIntent = B.intent(state, slot, brainDiff) || {};
+    if (Array.isArray(rootIntent.preferred)) {
+      for (let i = 0; i < rootIntent.preferred.length; i++) {
+        const pk = rootIntent.preferred[i];
+        if (pk && !advisedKeys.includes(pk)) {
+          advisedKeys.push(pk);
+        }
+      }
+    }
+
+    if (isSmartDifficulty && enemyCanUseS && ownCanUseOmni && !advisedKeys.includes(ownOmniKey)) {
+      advisedKeys.unshift(ownOmniKey);
     }
 
     const liveSelfDir =
@@ -2611,6 +2682,11 @@
     const oppMinS = minSChiCost(state, opponentSlot);
     const oppIsFainted = Boolean(state[opponentSlot]?.isFainted);
     const consecutiveSD = countConsecutiveSD(history, slot);
+
+    const ownRootMods = C.modifiers(state[slot]);
+    const oppRootMods = C.modifiers(state[opponentSlot]);
+    const oppRootDmgTakenMult = Number(oppRootMods?.damageTakenMult || 1);
+    const ownRootChiDrainOnHit = Number(ownRootMods?.chiDrainOnHit || 0);
 
     const rows = [];
 
@@ -2663,6 +2739,15 @@
       const ownIsOmni = isOmniGuardMove(state, slot, action.key);
 
       if (isSmartDifficulty && !oppIsFainted) {
+        if (ownMove?.offensive) {
+          if (oppRootDmgTakenMult > 1.01) {
+            tacticalRootBonus += 10 * Math.min(0.6, oppRootDmgTakenMult - 1);
+          }
+          if (ownRootChiDrainOnHit > 0 && oppChi > 0) {
+            tacticalRootBonus += 6;
+          }
+        }
+
         if (ownIsOmni && enemyCanUseS) {
           tacticalRootBonus +=
             36 * enemySProb +
@@ -2749,15 +2834,28 @@
 
       /*
        * BULLET ANT (master) State-Aware Tactical Shift (myLp > oppLp) & Anti-Spam:
-       * Promotes W buffs, A guards, and low-CHI IDLE into the Top 4 when holding an LP lead.
+       * Promotes W buffs/debuffs, A guards, and low-CHI IDLE into the Top 4 when holding an LP lead.
        */
       if (isBulletAnt && !oppIsFainted) {
         if (myLp > oppLp) {
           if (isWMove(state, slot, action.key)) {
-            const buffId = ownMove?.buff?.id || action.key;
-            const alreadyActive = (state[slot]?.activeBuffs || []).some(
-              b => b.id === buffId && Number(b.roundsLeft) > 1
-            );
+            const debuffSpec = ownMove?.debuff || ownMove?.targetDebuff;
+            const selfBuffAlreadyActive = ownMove?.buff?.id
+              ? (state[slot]?.activeBuffs || []).some(
+                  b => b.id === ownMove.buff.id && Number(b.roundsLeft) > 1
+                )
+              : false;
+            const enemyDebuffAlreadyActive = debuffSpec?.id
+              ? (state[opponentSlot]?.activeBuffs || []).some(
+                  b => b.id === debuffSpec.id && Number(b.roundsLeft) > 1
+                )
+              : false;
+            const alreadyActive =
+              (ownMove?.buff?.id || debuffSpec?.id)
+                ? ((!ownMove?.buff?.id || selfBuffAlreadyActive) && (!debuffSpec?.id || enemyDebuffAlreadyActive))
+                : (state[slot]?.activeBuffs || []).some(
+                    b => b.id === action.key && Number(b.roundsLeft) > 1
+                  );
             if (!alreadyActive) {
               tacticalRootBonus += 22;
             }
@@ -3100,7 +3198,7 @@
               : "Bullet Ant: Diversified Top-4 Master Search"
             : isRider
               ? "Rider: EV_Tree + EV_Matrix + EV_Live Counter Search"
-              : (B.intent(state, slot, brainDiff) || {}).name || "Cricket: All-Balanced Search",
+              : rootIntent.name || "Cricket: All-Balanced Search",
         rootActions: ownActions.length,
         opponentActions: opponentPolicy.length,
         completedHorizon,
