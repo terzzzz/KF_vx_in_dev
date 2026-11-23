@@ -1,7 +1,7 @@
 /* js/neural_core.js
- * CPU MLP, Adam, masked action selection, n-step foresight selection, replay, Double DQN,
- * and 49-Matchup Compact Matrix Pool (7v7 Rider-vs-Rider).
- * Build: v5-state256-action17
+- CPU MLP, Adam, masked action selection, n-step foresight selection, replay, Double DQN,
+- and 64-Matchup Compact Matrix Pool (8v8 Rider-vs-Rider, r0..r7).
+- Build: v5-state256-action17
  */
 (function (g) {
   "use strict";
@@ -12,6 +12,28 @@
   // Default compact architecture for 1v1 matchup matrices: 256 -> 64 -> 32 -> 17
   const COMPACT_MATCHUP_SIZES = Object.freeze([256, 64, 32, 17]);
   const GDRIVE_FOLDER_ID = "15P5HeKqLxMYw3ykirJj2HMT726SZnkId";
+
+  const CANONICAL_RIDER_INDEX = Object.freeze({
+    ichigo: 0,
+    nigo: 1,
+    v3: 2,
+    riderman: 3,
+    x: 4,
+    amazon: 5,
+    stronger: 6,
+    skyrider: 7,
+    super1: 8,
+    super_1: 8,
+    zx: 9,
+    black: 10,
+    rx: 11,
+    robo: 12,
+    bio: 13,
+    shin: 14,
+    zo: 15,
+    j: 16,
+    shadowmoon: 17
+  });
 
   function validateSizes(sizes) {
     if (
@@ -717,7 +739,7 @@
   }
 
   /**
-   * 49-Matchup Compact Matrix Pool (7 Riders vs 7 Riders)
+   * 64-Matchup Compact Matrix Pool (18 Riders vs 18 Riders, r0..r7 etc)
    * Stores and syncs individual 1v1 matrices (`matrix_rA_vs_rB.json`)
    * with Google Drive Folder 15P5HeKqLxMYw3ykirJj2HMT726SZnkId.
    */
@@ -728,36 +750,44 @@
         : [...COMPACT_MATCHUP_SIZES];
       validateSizes(this.sizes);
 
-      this.numRiders = Number(options.numRiders) || 7;
+      this.numRiders = Number(options.numRiders) || 18;
       this.capacityPerMatchup = Number(options.capacityPerMatchup) || 8192;
       this.folderId = options.folderId || GDRIVE_FOLDER_ID;
       this.learners = new Map();
     }
 
-    static normalizeRiderIndex(rider) {
-      if (typeof rider === "number" && Number.isInteger(rider)) {
-        return Math.max(0, Math.min(6, rider));
+    static normalizeRiderIndex(id, maxSlots = 18) {
+      if (typeof id === "number" && Number.isInteger(id)) {
+        return Math.max(0, Math.min(maxSlots - 1, id));
       }
-      const str = String(rider || "").trim().toLowerCase();
-      const match = str.match(/(\d+)/);
-      if (match) {
-        return Math.max(0, Math.min(6, Number(match[1])));
+      const raw = String(id ?? "").trim().toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(CANONICAL_RIDER_INDEX, raw)) {
+        return Math.max(0, Math.min(maxSlots - 1, CANONICAL_RIDER_INDEX[raw]));
+      }
+      if (/^\d{3}$/.test(raw)) {
+        return Math.max(0, Math.min(maxSlots - 1, Number(raw) - 1));
+      }
+      if (/^r(\d+)$/.test(raw)) {
+        return Math.max(0, Math.min(maxSlots - 1, Number(raw.slice(1))));
+      }
+      if (/^\d+$/.test(raw)) {
+        return Math.max(0, Math.min(maxSlots - 1, Number(raw)));
       }
       return 0;
     }
 
-    static getKey(riderA, riderB) {
-      const a = MatchupMatrixPool.normalizeRiderIndex(riderA);
-      const b = MatchupMatrixPool.normalizeRiderIndex(riderB);
+    static getKey(riderA, riderB, maxSlots = 8) {
+      const a = MatchupMatrixPool.normalizeRiderIndex(riderA, maxSlots);
+      const b = MatchupMatrixPool.normalizeRiderIndex(riderB, maxSlots);
       return `r${a}_vs_r${b}`;
     }
 
-    static getFileName(riderA, riderB) {
-      return `matrix_${MatchupMatrixPool.getKey(riderA, riderB)}.json`;
+    static getFileName(riderA, riderB, maxSlots = 8) {
+      return `matrix_${MatchupMatrixPool.getKey(riderA, riderB, maxSlots)}.json`;
     }
 
     getOrCreateSync(riderA, riderB, mode = "train", seed = 1) {
-      const key = MatchupMatrixPool.getKey(riderA, riderB);
+      const key = MatchupMatrixPool.getKey(riderA, riderB, this.numRiders);
       let learner = this.learners.get(key);
 
       if (!learner) {
@@ -775,7 +805,7 @@
     }
 
     async getMatchupLearner(riderA, riderB, mode = "game", seed = 1) {
-      const key = MatchupMatrixPool.getKey(riderA, riderB);
+      const key = MatchupMatrixPool.getKey(riderA, riderB, this.numRiders);
       if (this.learners.has(key)) {
         const existing = this.learners.get(key);
         existing.setMode(mode);
@@ -785,8 +815,8 @@
       const storage = g.MatrixStorage || g.matrixStorage || null;
       if (storage && typeof storage.loadMatchupMatrix === "function") {
         try {
-          const a = MatchupMatrixPool.normalizeRiderIndex(riderA);
-          const b = MatchupMatrixPool.normalizeRiderIndex(riderB);
+          const a = MatchupMatrixPool.normalizeRiderIndex(riderA, this.numRiders);
+          const b = MatchupMatrixPool.normalizeRiderIndex(riderB, this.numRiders);
           const loaded = await storage.loadMatchupMatrix(a, b);
           if (loaded) {
             const learner = Learner.fromJSON(loaded, seed, {
@@ -806,9 +836,9 @@
     }
 
     async saveMatchup(riderA, riderB) {
-      const a = MatchupMatrixPool.normalizeRiderIndex(riderA);
-      const b = MatchupMatrixPool.normalizeRiderIndex(riderB);
-      const key = MatchupMatrixPool.getKey(a, b);
+      const a = MatchupMatrixPool.normalizeRiderIndex(riderA, this.numRiders);
+      const b = MatchupMatrixPool.normalizeRiderIndex(riderB, this.numRiders);
+      const key = MatchupMatrixPool.getKey(a, b, this.numRiders);
       const learner = this.learners.get(key);
       if (!learner) return null;
 
@@ -824,7 +854,7 @@
       const results = [];
       for (let rA = 0; rA < this.numRiders; rA++) {
         for (let rB = 0; rB < this.numRiders; rB++) {
-          const key = MatchupMatrixPool.getKey(rA, rB);
+          const key = MatchupMatrixPool.getKey(rA, rB, this.numRiders);
           if (this.learners.has(key)) {
             const res = await this.saveMatchup(rA, rB);
             results.push({ key, saved: Boolean(res) });
