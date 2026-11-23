@@ -5,7 +5,8 @@
  *   - Environment-owned observations and legal-action masks.
  *   - One replay transition per resolved round.
  *   - Multi-turn proportional credit assignment for W buffs, stackable evasion,
- *     attack multipliers, and periodic LP regen/bleed payoffs (strictly non-stacking per buffId).
+ *     attack multipliers, armor_break (damageTakenMult), chiDrainOnHit, and
+ *     periodic LP regen/bleed payoffs (strictly non-stacking per buffId).
  *   - Per-match tactical parameter telemetry (16 metrics + 10 reserved backup slots).
  *   - Rider Matrix EV (30 * P_Matrix + 45 * V_Matrix) for live Rider search policy.
  *   - Tactical execution-charge resolver with +1% to +12% randomizer, hit-chance floor,
@@ -370,6 +371,7 @@
     }
 
     const maxLp = Math.max(1, Number(player.maxLp || 1600));
+    const maxChi = Math.max(1, Number(player.maxChi || 16));
     const missingLp = Math.max(0, maxLp - Number(player.lp || 0));
     const missingRatio = K.clamp(missingLp / maxLp, 0, 1);
 
@@ -416,6 +418,23 @@
 
         if (eff.armor !== undefined && Number(eff.armor) < 1) {
           score += (1 - Number(eff.armor)) * 0.85 * durationWeight;
+        }
+
+        const damageTakenMult =
+          eff.damageTakenMult !== undefined
+            ? Number(eff.damageTakenMult)
+            : buff.damageTakenMult !== undefined
+              ? Number(buff.damageTakenMult)
+              : 1;
+        if (Number.isFinite(damageTakenMult) && damageTakenMult !== 1) {
+          score -= (damageTakenMult - 1) * 0.85 * durationWeight;
+        }
+
+        const chiDrainOnHit = Number(
+          buff.chiDrainOnHit ?? eff.chiDrainOnHit ?? 0
+        );
+        if (chiDrainOnHit > 0) {
+          score += (chiDrainOnHit / maxChi) * 1.45 * durationWeight;
         }
 
         if (eff.speed !== undefined && Number(eff.speed) !== 1) {
@@ -678,17 +697,27 @@
     const enemyBefore = before[enemySlot];
 
     const eff = move.buff?.effects || {};
+    const debuffEff = debuffSpec?.effects || {};
     const evasionBoost = Number(eff.evasion || 0);
     const attackMult = Number(eff.attack || 1);
     const dAttackMult = Number(eff.dAttack || 1);
     const sAttackMult = Number(eff.sAttack || 1);
     const armorMult = eff.armor !== undefined ? Number(eff.armor) : 1;
     const lpRegen = Number(move.buff?.lpRegen ?? eff.lpRegen ?? 0);
+    const chiDrainOnHit = Number(
+      move.buff?.chiDrainOnHit ?? eff.chiDrainOnHit ?? 0
+    );
     const lpBleed = Number(
       debuffSpec?.lpBleed ??
-      debuffSpec?.effects?.lpBleed ??
+      debuffEff.lpBleed ??
       0
     );
+    const damageTakenMult = Number(
+      debuffEff.damageTakenMult ??
+      debuffSpec?.damageTakenMult ??
+      1
+    );
+    const enemyVulnBonus = damageTakenMult > 1 ? damageTakenMult - 1 : 0;
     const grantsAirborne = Boolean(
       move.grantsAirborne ||
       Number(ownAfter.airborneTicks) > Number(ownBefore.airborneTicks)
@@ -701,7 +730,9 @@
       sAttackMult > 1 ||
       armorMult < 1 ||
       lpRegen > 0 ||
+      chiDrainOnHit > 0 ||
       lpBleed > 0 ||
+      enemyVulnBonus > 0 ||
       grantsAirborne;
 
     if (!hasBuffEffect) {
@@ -735,12 +766,14 @@
       ? findActiveBuff(enemyBefore, debuffId)
       : null;
 
+    const hasEnemyDebuffEffect = lpBleed > 0 || enemyVulnBonus > 0;
+
     // CombatCore overwrites same-ID buffs without stacking potency.
     // Do not reward redundant non-offensive recasts of an already-active buff.
     if (
       !move.offensive &&
       (prevOwnBuff || prevAirborne) &&
-      (lpBleed <= 0 || Boolean(prevEnemyDebuff))
+      (!hasEnemyDebuffEffect || Boolean(prevEnemyDebuff))
     ) {
       return null;
     }
@@ -749,7 +782,7 @@
       grantsAirborne ||
       Boolean(findActiveBuff(ownAfter, buffId));
     const enemyDebuffActive =
-      lpBleed > 0 &&
+      hasEnemyDebuffEffect &&
       Boolean(findActiveBuff(enemyAfter, debuffId));
 
     if (!ownBuffActive && !enemyDebuffActive) {
@@ -767,7 +800,9 @@
       sAttackBonus: ownBuffActive && sAttackMult > 1 ? sAttackMult - 1 : 0,
       armorReduction: ownBuffActive && armorMult < 1 ? 1 - armorMult : 0,
       lpRegen: ownBuffActive ? lpRegen : 0,
-      lpBleed: enemyDebuffActive ? lpBleed : 0
+      chiDrainOnHit: ownBuffActive ? chiDrainOnHit : 0,
+      lpBleed: enemyDebuffActive ? lpBleed : 0,
+      enemyVulnBonus: enemyDebuffActive ? enemyVulnBonus : 0
     };
   }
 
@@ -813,7 +848,7 @@
         Boolean(findActiveBuff(ownBefore, meta.buffId)) ||
         (Number(ownBefore.airborneTicks) > 0 && meta.evasionBoost > 0);
       const stillHasEnemyDebuff =
-        meta.lpBleed > 0 &&
+        (meta.lpBleed > 0 || meta.enemyVulnBonus > 0) &&
         Boolean(findActiveBuff(enemyBefore, meta.debuffId));
 
       if (stillHasOwnBuff || stillHasEnemyDebuff) {
@@ -832,6 +867,7 @@
 
     const ownMaxLp = Math.max(1, Number(ownBefore.maxLp || 1600));
     const enemyMaxLp = Math.max(1, Number(enemyBefore.maxLp || 1600));
+    const enemyMaxChi = Math.max(1, Number(enemyBefore.maxChi || 16));
 
     const ownPeriodic = estimatePeriodicLpDelta(ownBefore, ownAfter);
     const enemyPeriodic = estimatePeriodicLpDelta(enemyBefore, enemyAfter);
@@ -856,25 +892,30 @@
 
     if (directDamageDealt > 1 && ownMove?.offensive) {
       let totalAttackBonus = 0;
+      let totalEnemyVulnBonus = 0;
       const entryWeights = new Float64Array(activeEntries.length);
 
       for (let i = 0; i < activeEntries.length; i++) {
         const m = activeEntries[i].buffMeta;
-        let bonus = m.attackBonus;
-        if (ownMoveDir === "D") bonus += m.dAttackBonus;
-        if (ownMoveDir === "S") bonus += m.sAttackBonus;
-        entryWeights[i] = bonus;
-        totalAttackBonus += bonus;
+        let atkBonus = m.attackBonus;
+        if (ownMoveDir === "D") atkBonus += m.dAttackBonus;
+        if (ownMoveDir === "S") atkBonus += m.sAttackBonus;
+        const vulnBonus = Math.max(0, m.enemyVulnBonus || 0);
+        entryWeights[i] = atkBonus + vulnBonus;
+        totalAttackBonus += atkBonus;
+        totalEnemyVulnBonus += vulnBonus;
       }
 
-      if (totalAttackBonus > 0) {
-        const totalMult = 1 + totalAttackBonus;
+      const totalCombinedBonus = totalAttackBonus + totalEnemyVulnBonus;
+      if (totalCombinedBonus > 0) {
+        const combinedMult = (1 + totalAttackBonus) * (1 + totalEnemyVulnBonus);
+        const bonusFraction = 1 - 1 / combinedMult;
         const bonusDamageRatio =
-          (directDamageDealt * (totalAttackBonus / totalMult)) / enemyMaxLp;
+          (directDamageDealt * bonusFraction) / enemyMaxLp;
 
         for (let i = 0; i < activeEntries.length; i++) {
           if (entryWeights[i] <= 0) continue;
-          const share = entryWeights[i] / totalAttackBonus;
+          const share = entryWeights[i] / totalCombinedBonus;
           const credit = 1.35 * bonusDamageRatio * share;
           activeEntries[i].transition.r += credit;
           activeEntries[i].transition.rewardCategory = "Dmg";
@@ -882,6 +923,45 @@
             activeEntries[i].transition.weightScale || 1,
             1.75
           );
+        }
+      }
+
+      // Attribute realized Chi drain on hit from active chiDrainOnHit buffs
+      let totalChiDrainOnHit = 0;
+      for (let i = 0; i < activeEntries.length; i++) {
+        totalChiDrainOnHit += Math.max(0, activeEntries[i].buffMeta.chiDrainOnHit || 0);
+      }
+
+      if (totalChiDrainOnHit > 0 && enemyAfter.chi < enemyBefore.chi) {
+        const enemyActionKey = actions?.[enemySlot]?.key || "";
+        const enemyMove = before.moves?.[enemySlot]?.[enemyActionKey];
+        const enemyMoveChiCost = Math.max(0, Number(enemyMove?.chiCost || 0));
+        const enemyMoveChiGain = Math.max(0, Number(enemyMove?.chiGain || 0));
+        const expectedEnemyChiWithoutDrain = Math.max(
+          0,
+          enemyBefore.chi - enemyMoveChiCost + enemyMoveChiGain
+        );
+        const realizedChiDrained = Math.max(
+          0,
+          expectedEnemyChiWithoutDrain - enemyAfter.chi
+        );
+
+        if (realizedChiDrained > 0) {
+          const drainedRatio =
+            Math.min(realizedChiDrained, totalChiDrainOnHit) / enemyMaxChi;
+
+          for (let i = 0; i < activeEntries.length; i++) {
+            const entry = activeEntries[i];
+            const drain = Math.max(0, entry.buffMeta.chiDrainOnHit || 0);
+            if (drain <= 0) continue;
+            const share = drain / totalChiDrainOnHit;
+            entry.transition.r += 1.25 * drainedRatio * share;
+            entry.transition.rewardCategory = "Dmg";
+            entry.transition.weightScale = Math.max(
+              entry.transition.weightScale || 1,
+              1.75
+            );
+          }
         }
       }
     }
@@ -1048,7 +1128,11 @@
     const oppChi = Number(opp?.chi || 0);
     const oppMinS = minSChiCost(state, oppSlot);
     const oppMaxLp = Math.max(1, Number(opp?.maxLp || 1600));
-    const oppLpRatio = Number(opp?.lp || 0) / oppMaxLp;
+    const oppDmgTakenMult = Math.max(
+      1,
+      Number(C.modifiers(opp)?.damageTakenMult || 1)
+    );
+    const oppLpRatio = (Number(opp?.lp || 0) / oppDmgTakenMult) / oppMaxLp;
 
     // Rule 2: Faint > 75% AND Opponent Chi check
     const highFaintRisk =
@@ -1662,12 +1746,15 @@
 
       const redundantBuff = getRedundantActiveBuff(before, slot, ownKey);
       const activeMods = C.modifiers(before[slot]);
+      const enemyMods = C.modifiers(before[enemySlot]);
+      const enemyHasArmorBreak = Number(enemyMods?.damageTakenMult || 1) > 1.01;
       const isBuffedStanceAttack =
         Boolean(ownMove?.offensive) &&
         (
           activeMods.attack > 1.01 ||
           (ownMove.direction === "D" && activeMods.dAttack > 1.01) ||
-          (ownMove.direction === "S" && activeMods.sAttack > 1.01)
+          (ownMove.direction === "S" && activeMods.sAttack > 1.01) ||
+          enemyHasArmorBreak
         );
 
       let effectiveStatusDelta = rawStatusDelta;
@@ -1677,12 +1764,13 @@
         effectiveStatusDelta = Math.min(0, rawStatusDelta);
         reward -= Number(redundantBuff.roundsLeft) >= 2 ? 0.22 : 0.14;
       } else if (isBuffedStanceAttack) {
-        // Do not penalize natural 1-turn buff tick-down when cashing out with an attack
+        // Do not penalize natural 1-turn buff/armor_break tick-down when cashing out with an attack
         const enemyStatusDelta =
           fighterStatusValue(before[enemySlot]) - fighterStatusValue(after[enemySlot]);
         effectiveStatusDelta = Math.max(rawStatusDelta, enemyStatusDelta);
 
         if (enemyLpChange > 0) {
+          effectiveStatusDelta = Math.max(0, effectiveStatusDelta);
           reward += 0.12 * K.clamp(enemyLpChange / 0.15, 0.35, 1.0);
         }
       }
@@ -2220,17 +2308,27 @@
             )
           : null;
 
-      // Supersede any older pendingWindow entry with the same buffId,
+      // Supersede any older pendingWindow entry with the same buffId or debuffId,
       // matching CombatCore.applyBuff() overwriting same-ID statuses.
       const resolvedMoveObj = before.moves?.[learnerSlot]?.[resolvedAction.key];
+      const resolvedDebuffSpec =
+        resolvedMoveObj?.debuff || resolvedMoveObj?.targetDebuff;
       const overwrittenBuffId =
         buffMeta?.buffId ||
         (!resolvedMoveObj?.offensive ? resolvedMoveObj?.buff?.id : null);
+      const overwrittenDebuffId =
+        buffMeta?.debuffId ||
+        resolvedDebuffSpec?.id ||
+        null;
 
-      if (overwrittenBuffId) {
+      if (overwrittenBuffId || overwrittenDebuffId) {
         for (let i = 0; i < pendingWindow.length; i++) {
           const item = pendingWindow[i];
-          if (item.buffMeta && item.buffMeta.buffId === overwrittenBuffId) {
+          if (!item.buffMeta) continue;
+          if (
+            (overwrittenBuffId && item.buffMeta.buffId === overwrittenBuffId) ||
+            (overwrittenDebuffId && item.buffMeta.debuffId === overwrittenDebuffId)
+          ) {
             item.buffMeta.roundsRemaining = 0;
           }
         }
