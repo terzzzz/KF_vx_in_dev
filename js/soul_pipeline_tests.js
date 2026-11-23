@@ -1,16 +1,16 @@
 /* js/soul_pipeline_tests.js
-- Integration checks for the v8 Rider Matrix Bundle & neural pipeline.
-- Build: v5-state256-action17-charge1-reset1-v8matrix
+ * Integration checks for the v8 Rider Matrix Bundle & neural pipeline.
+ * Build: v5-state256-action17-charge1-reset1-v8matrix
  *
-- Contracts:
-- - 256 observation inputs and 17 actions (42,257 parameters per matchup).
-- - Action index 16 is DO_NOTHING.
-- - Planning masks use reachable-charge legality.
-- - Missing controller inputs mean WAIT.
-- - Repeating a direction preserves its charge clock.
-- - Changing direction resets the charge clock.
-- - Per-Rider Master Bundle (001.json) packs 001_001..001_008 + 9 backup slots
--   and reserved match parameter slots without cross-matchup weight pollution.
+ * Contracts:
+ * - 256 observation inputs and 17 actions (42,257 parameters per matchup).
+ * - Action index 16 is DO_NOTHING.
+ * - Planning masks use reachable-charge legality.
+ * - Missing controller inputs mean WAIT.
+ * - Repeating a direction preserves its charge clock.
+ * - Changing direction resets the charge clock.
+ * - Per-Rider Master Bundle (001.json) packs 001_001..001_008 + 9 backup slots
+ *   and reserved match parameter slots without cross-matchup weight pollution.
  */
 (function (g) {
   "use strict";
@@ -185,6 +185,48 @@
       );
     });
 
+    test("Execution mode gating and 20-float foresight plan memory (indices 108..127)", () => {
+      const prevMode = E.getExecutionMode();
+      try {
+        const trainState = fresh();
+        const trainEnv = E.create(trainState, {}, { mode: "train" });
+        const trainVec = E.vector(E.observe(trainEnv, "p1"), spec);
+
+        for (let i = 108; i <= 127; i++) {
+          assert(
+            trainVec[i] === 0,
+            `Expected plan memory index ${i} to be 0 in 'train' mode, got ${trainVec[i]}.`
+          );
+        }
+
+        const gameState = fresh();
+        const gameEnv = E.create(gameState, {}, { mode: "game" });
+        const gameVec = E.vector(E.observe(gameEnv, "p1"), spec);
+
+        let oneHotSum = 0;
+        for (let i = 108; i <= 124; i++) {
+          oneHotSum += gameVec[i];
+        }
+
+        assert(
+          Math.abs(oneHotSum - 1) < 1e-6,
+          `Expected one-hot planned action in indices 108..124 during 'game' mode, got sum=${oneHotSum}.`
+        );
+
+        assert(
+          gameVec[125] === 1,
+          `Expected planned action legality flag (index 125) to be 1, got ${gameVec[125]}.`
+        );
+
+        assert(
+          gameVec[126] > 0 && gameVec[126] <= 1,
+          `Expected remaining plan horizon ratio (index 126) in (0, 1], got ${gameVec[126]}.`
+        );
+      } finally {
+        E.setExecutionMode(prevMode);
+      }
+    });
+
     test("Planning mask agrees with reachable-charge legality", () => {
       for (const slot of ["p1", "p2"]) {
         for (const chiCase of ["zero", "maximum"]) {
@@ -276,7 +318,7 @@
         "Expected at least 8 active riders (001..008)."
       );
 
-      const skyrider = data.riders[7];
+      const skyrider = data.riders.find(r => r.id === "008") || data.riders[7];
       const state = C.createMatch(skyrider, first, data.moves);
       state.p1.chi = state.p1.maxChi;
       state.p1.airborneTicks = 0;
