@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1"
   >
 
-  <title>Kamen Fight — RIDER Training (Row-by-Row 8×8 Matrix)</title>
+  <title>Kamen Fight — RIDER Training (Row-by-Row Matrix, up to 18×18)</title>
 
   <style>
     body {
@@ -109,7 +109,7 @@
 
     .matrix-row-grid {
       display: grid;
-      grid-template-columns: repeat(8, minmax(95px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
       gap: 6px;
       margin-top: 6px;
     }
@@ -150,7 +150,7 @@
     <a href="index.html">← Return to game</a>
   </p>
 
-  <!-- Row-Isolated Google Drive & Memory Control Bar (8 Files per Row) -->
+  <!-- Row-Isolated Google Drive & Memory Control Bar (Dynamic up to 18 Files per Row) -->
   <section id="matrix-row-control-bar" class="matrix-row-bar">
     <div class="matrix-flex-row">
       <span class="matrix-badge">
@@ -174,32 +174,26 @@
       <select id="active-row-select"
               class="matrix-select"
               onchange="window.switchActiveMatrixRow(Number(this.value), true)">
-        <option value="0">Row r0 — Kamen Rider Ichigo [001] (8 files)</option>
-        <option value="1">Row r1 — Kamen Rider Nigo [002] (8 files)</option>
-        <option value="2">Row r2 — Kamen Rider V3 [003] (8 files)</option>
-        <option value="3">Row r3 — Riderman [004] (8 files)</option>
-        <option value="4">Row r4 — Kamen Rider X [005] (8 files)</option>
-        <option value="5">Row r5 — Kamen Rider Amazon [006] (8 files)</option>
-        <option value="6">Row r6 — Kamen Rider Stronger [007] (8 files)</option>
-        <option value="7">Row r7 — Skyrider [008] (8 files)</option>
       </select>
 
-      <button type="button"
+      <button id="pull-row-btn"
+              type="button"
               class="matrix-btn"
               onclick="window.loadActiveRowFromDrive()">
-        1. Pull Row (8 Files) ← Drive
+1. Pull Row (8 Files) ← Drive
       </button>
 
-      <button type="button"
+      <button id="sync-row-btn"
+              type="button"
               class="matrix-btn"
               onclick="window.syncActiveRowToDrive()">
-        2. Sync Row (8 Files) → Drive
+2. Sync Row (8 Files) → Drive
       </button>
 
       <button type="button"
               class="matrix-btn danger"
               onclick="window.cutConnectionAndPurgeRowRAM()">
-        3. Cut Connection & Purge Row RAM
+3. Cut Connection &amp; Purge Row RAM
       </button>
 
       <button type="button"
@@ -231,16 +225,16 @@
              placeholder="https://script.google.com/macros/s/.../exec"
              onchange="window.MatrixStorage.setGasWebAppUrl(this.value)">
       <span id="matrix-sync-status" style="font-size:0.82rem;color:#00ffcc;">
-        Row r0 selected. Only 8 files will be held in active RAM.
+        Row r0 selected. Only active row files will be held in RAM.
       </span>
     </div>
 
-    <!-- Active Row 8-Cell Strip -->
+    <!-- Active Row Dynamic Cell Strip -->
     <div id="matrix-active-row-grid" class="matrix-row-grid"></div>
 
     <div id="gas-script-drawer" hidden>
       <div style="font-size:0.8rem;color:#9cc2d8;">
-        Google Apps Script (<code>Code.gs</code>) supporting all 64 files (<code>r0</code>..<code>r7</code>) row-by-row in folder <code>15P5HeKqLxMYw3ykirJj2HMT726SZnkId</code>:
+        Google Apps Script (<code>Code.gs</code>) supporting up to 18×18 matrix files (<code>r0</code>..<code>r17</code>) row-by-row in folder <code>15P5HeKqLxMYw3ykirJj2HMT726SZnkId</code>:
       </div>
       <pre id="gas-script-code" class="gas-code-pre"></pre>
     </div>
@@ -259,9 +253,10 @@
 
       const GDRIVE_FOLDER_ID = "15P5HeKqLxMYw3ykirJj2HMT726SZnkId";
       const GAS_URL_STORAGE_KEY = "kf_gdrive_gas_webapp_url";
-      const RAM_ROW_CACHE = (g.__KF_MATRIX64_RAM__ = g.__KF_MATRIX49_RAM__ = {});
+      const MATRIX_SLOT_COUNT = 18;
+      const RAM_ROW_CACHE = (g.__KF_MATRIX_RAM__ = g.__KF_MATRIX64_RAM__ = g.__KF_MATRIX49_RAM__ = {});
 
-      const ACTIVE_RIDERS_8 = [
+      const ACTIVE_RIDERS = [
         { index: 0, id: "ichigo",   code: "r0", soulCode: "001", name: "Kamen Rider Ichigo" },
         { index: 1, id: "nigo",     code: "r1", soulCode: "002", name: "Kamen Rider Nigo" },
         { index: 2, id: "v3",       code: "r2", soulCode: "003", name: "Kamen Rider V3" },
@@ -275,9 +270,37 @@
       let activeRowIndex = 0;
       let activeAbortController = null;
 
+      function formatSoulCode(idx) {
+        return String(idx + 1).padStart(3, "0");
+      }
+
+      function renderRowSelectOptions() {
+        const selectEl = document.getElementById("active-row-select");
+        if (!selectEl) return;
+
+        const rowLen = ACTIVE_RIDERS.length;
+        selectEl.innerHTML = ACTIVE_RIDERS.map(r =>
+          `<option value="${r.index}">Row ${r.code} — ${r.name} [${r.soulCode}] (${rowLen} files)</option>`
+        ).join("");
+
+        if (activeRowIndex >= rowLen) {
+          activeRowIndex = 0;
+        }
+        selectEl.value = String(activeRowIndex);
+
+        const pullBtn = document.getElementById("pull-row-btn");
+        if (pullBtn) {
+          pullBtn.textContent = `1. Pull Row (${rowLen} Files) ← Drive`;
+        }
+        const syncBtn = document.getElementById("sync-row-btn");
+        if (syncBtn) {
+          syncBtn.textContent = `2. Sync Row (${rowLen} Files) → Drive`;
+        }
+      }
+
       function getRowManifest(rowIdx) {
-        const rA = ACTIVE_RIDERS_8[rowIdx] || ACTIVE_RIDERS_8[0];
-        return ACTIVE_RIDERS_8.map(rB => {
+        const rA = ACTIVE_RIDERS[rowIdx] || ACTIVE_RIDERS[0];
+        return ACTIVE_RIDERS.map(rB => {
           const key = `r${rA.index}_vs_r${rB.index}`;
           return {
             key,
@@ -292,47 +315,88 @@
       }
 
       function syncManifestWithDataset(riders) {
-        if (!Array.isArray(riders)) return;
-        for (let i = 0; i < ACTIVE_RIDERS_8.length && i < riders.length; i++) {
-          if (riders[i]?.id) ACTIVE_RIDERS_8[i].id = riders[i].id;
-          if (riders[i]?.name) ACTIVE_RIDERS_8[i].name = riders[i].name;
-        }
+        if (!Array.isArray(riders) || riders.length === 0) return;
+        const capped = riders.slice(0, MATRIX_SLOT_COUNT);
+        ACTIVE_RIDERS.length = 0;
+
+        capped.forEach((rider, idx) => {
+          const id = String(rider?.id || `rider_${idx + 1}`).trim();
+          const name = String(rider?.name || id).trim();
+          ACTIVE_RIDERS.push({
+            index: idx,
+            id,
+            code: `r${idx}`,
+            soulCode: formatSoulCode(idx),
+            name
+          });
+        });
+
+        renderRowSelectOptions();
+        renderActiveRowGrid();
       }
 
-      const VALID_64_FILE_LINES = ACTIVE_RIDERS_8.map(rA =>
-        "  " + ACTIVE_RIDERS_8.map(rB => `'matrix_r${rA.index}_vs_r${rB.index}.json'`).join(",")
-      ).join(",\n");
-
       const GOOGLE_APPS_SCRIPT_TEMPLATE = [
-        "/* Google Apps Script (Code.gs) for Kamen Fight 64 Matchup Matrices (Row-by-Row) */",
+        "/* Google Apps Script (Code.gs) for Kamen Fight 18x18 Matrix Capacity (r0..r17) */",
         "const FOLDER_ID = '15P5HeKqLxMYw3ykirJj2HMT726SZnkId';",
-        "const VALID_64_FILES = new Set([",
-        VALID_64_FILE_LINES,
-        "]);",
+        "const MATRIX_SLOT_COUNT = 18; // r0..r17 (001..018)",
+        "",
+        "function isValidMatrixFilename(fileName) {",
+        "  if (typeof fileName !== 'string') return false;",
+        "  const cellMatch = /^matrix_r(\\d+)_vs_r(\\d+)\\.json$/.exec(fileName);",
+        "  if (cellMatch) {",
+        "    const a = Number(cellMatch[1]);",
+        "    const b = Number(cellMatch[2]);",
+        "    return a >= 0 && a < MATRIX_SLOT_COUNT && b >= 0 && b < MATRIX_SLOT_COUNT;",
+        "  }",
+        "  const bundleMatch = /^(\\d{3})\\.json$/.exec(fileName);",
+        "  if (bundleMatch) {",
+        "    const code = Number(bundleMatch[1]);",
+        "    return code >= 1 && code <= MATRIX_SLOT_COUNT;",
+        "  }",
+        "  return false;",
+        "}",
         "",
         "function doGet(e) {",
-        "  const file = e.parameter.file || ('matrix_' + e.parameter.key + '.json');",
+        "  const params = (e && e.parameter) || {};",
+        "  const file = params.file || ('matrix_' + params.key + '.json');",
         "  const data = loadMatrixFromDriveFolder(FOLDER_ID, file);",
         "  return ContentService.createTextOutput(data || '{}').setMimeType(ContentService.MimeType.JSON);",
         "}",
         "",
         "function doPost(e) {",
-        "  const body = JSON.parse(e.postData.contents || '{}');",
-        "  const file = body.fileName || ('matrix_' + body.key + '.json');",
-        "  const res = saveMatrixToDriveFolder(FOLDER_ID, file, JSON.stringify(body.payload));",
-        "  return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);",
+        "  const lock = LockService.getScriptLock();",
+        "  lock.waitLock(30000);",
+        "  try {",
+        "    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');",
+        "    const file = body.fileName || ('matrix_' + body.key + '.json');",
+        "    const res = saveMatrixToDriveFolder(FOLDER_ID, file, body.payload);",
+        "    return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);",
+        "  } finally {",
+        "    lock.releaseLock();",
+        "  }",
+        "}",
+        "",
+        "function isValidMatrixPayload(payload) {",
+        "  if (!payload || typeof payload !== 'object') return false;",
+        "  const net = payload.net || payload;",
+        "  return Array.isArray(net.sizes) && Array.isArray(net.layers) && net.layers.length > 0;",
         "}",
         "",
         "function loadMatrixFromDriveFolder(folderId, fileName) {",
-        "  if (!VALID_64_FILES.has(fileName)) return null;",
+        "  if (!isValidMatrixFilename(fileName)) return null;",
         "  const folder = DriveApp.getFolderById(folderId || FOLDER_ID);",
         "  const files = folder.getFilesByName(fileName);",
         "  if (!files.hasNext()) return null;",
         "  return files.next().getBlob().getDataAsString();",
         "}",
         "",
-        "function saveMatrixToDriveFolder(folderId, fileName, jsonString) {",
-        "  if (!VALID_64_FILES.has(fileName)) throw new Error('Invalid 64-matrix filename: ' + fileName);",
+        "function saveMatrixToDriveFolder(folderId, fileName, payloadOrJson) {",
+        "  if (!isValidMatrixFilename(fileName)) throw new Error('Invalid matrix filename (allowed r0..r17): ' + fileName);",
+        "  const parsed = typeof payloadOrJson === 'string' ? JSON.parse(payloadOrJson) : payloadOrJson;",
+        "  if (!isValidMatrixPayload(parsed)) {",
+        "    return { ok: true, skipped: true, fileName: fileName, reason: 'Empty or non-network payload' };",
+        "  }",
+        "  const jsonString = typeof payloadOrJson === 'string' ? payloadOrJson : JSON.stringify(parsed);",
         "  const folder = DriveApp.getFolderById(folderId || FOLDER_ID);",
         "  const files = folder.getFilesByName(fileName);",
         "  if (files.hasNext()) {",
@@ -346,24 +410,30 @@
       ].join("\n");
 
       function resolveRiderIndex(rider) {
-        const maxIdx = ACTIVE_RIDERS_8.length - 1;
+        const maxIdx = Math.max(0, ACTIVE_RIDERS.length - 1);
         if (typeof rider === "number" && Number.isInteger(rider)) {
           return Math.max(0, Math.min(maxIdx, rider));
         }
         const s = String(rider || "").trim().toLowerCase();
-        const byId = ACTIVE_RIDERS_8.find(
-          r => r.id === s || r.code === s || r.soulCode === s || s.includes(r.id)
+        const compact = s.replace(/_/g, "");
+        const byId = ACTIVE_RIDERS.find(
+          r =>
+            r.id.toLowerCase() === s ||
+            r.id.toLowerCase().replace(/_/g, "") === compact ||
+            r.code === s ||
+            r.soulCode === s
         );
         if (byId) return byId.index;
-        const m = s.match(/(\d+)/);
-        return m ? Math.max(0, Math.min(maxIdx, Number(m[1]))) : 0;
+        const m = s.match(/^r(\d+)$/);
+        if (m) return Math.max(0, Math.min(maxIdx, Number(m[1])));
+        return 0;
       }
 
       function getEntry(riderA, riderB) {
         const a = resolveRiderIndex(riderA);
         const b = resolveRiderIndex(riderB);
-        const rA = ACTIVE_RIDERS_8[a];
-        const rB = ACTIVE_RIDERS_8[b];
+        const rA = ACTIVE_RIDERS[a] || ACTIVE_RIDERS[0];
+        const rB = ACTIVE_RIDERS[b] || ACTIVE_RIDERS[0];
         const key = `r${a}_vs_r${b}`;
         return {
           key,
@@ -454,6 +524,11 @@
         }
         const bestSoul = soulCandidate || soulActive || null;
 
+        // Skip sending untrained null cells so Drive never receives empty overwrites
+        if (!bestSoul) {
+          return { ok: true, skipped: true, fileName: entry.file };
+        }
+
         let payloadString = JSON.stringify({
           matchupKey: entry.key,
           canonicalKey: entry.soulKey,
@@ -463,8 +538,9 @@
           p2Rider: entry.p2Id,
           learnerId: entry.p1Id,
           opponentId: entry.p2Id,
-          games: bestSoul ? bestSoul.games : 0,
-          steps: bestSoul ? bestSoul.steps : 0,
+          games: bestSoul.games || 0,
+          steps: bestSoul.steps || 0,
+          net: bestSoul.net,
           soulCandidate,
           soulActive,
           updatedAt: new Date().toISOString()
@@ -497,6 +573,7 @@
         if (!gridEl) return;
 
         const rowEntries = getRowManifest(activeRowIndex);
+        const totalInRow = rowEntries.length;
         let readyCount = 0;
         let trainedCount = 0;
 
@@ -529,7 +606,7 @@
 
         const countBadge = document.getElementById("matrix-row-count-badge");
         if (countBadge) {
-          countBadge.textContent = `ROW r${activeRowIndex}: ${trainedCount} TRAINED / ${readyCount} READY (OF 8)`;
+          countBadge.textContent = `ROW r${activeRowIndex}: ${trainedCount} TRAINED / ${readyCount} READY (OF ${totalInRow})`;
         }
       }
 
@@ -542,6 +619,7 @@
 
       g.getActiveMatrixRowIndex = () => activeRowIndex;
       g.getActiveRowEntries = () => getRowManifest(activeRowIndex);
+      g.renderMatrixHeaderGrid = renderActiveRowGrid;
       g.render64MatrixHeaderGrid = renderActiveRowGrid;
       g.render49MatrixHeaderGrid = renderActiveRowGrid;
 
@@ -583,7 +661,7 @@
       };
 
       g.switchActiveMatrixRow = function (newRowIdx, purgePrevious = true) {
-        const clamped = Math.max(0, Math.min(ACTIVE_RIDERS_8.length - 1, Number(newRowIdx) || 0));
+        const clamped = Math.max(0, Math.min(ACTIVE_RIDERS.length - 1, Number(newRowIdx) || 0));
         if (purgePrevious && clamped !== activeRowIndex) {
           g.cutConnectionAndPurgeRowRAM(true);
         }
@@ -594,7 +672,7 @@
           rowSelect.value = String(activeRowIndex);
         }
 
-        const riderObj = ACTIVE_RIDERS_8[activeRowIndex];
+        const riderObj = ACTIVE_RIDERS[activeRowIndex];
         if (riderObj && typeof g.SoulTrainer?.setLearnerId === "function") {
           g.SoulTrainer.setLearnerId(riderObj.id);
         }
@@ -605,7 +683,7 @@
         const status = document.getElementById("matrix-sync-status");
         if (status && riderObj) {
           status.textContent =
-            `Switched to Row r${activeRowIndex} (${riderObj.name} [${riderObj.soulCode}]). Only 8 files active.`;
+            `Switched to Row r${activeRowIndex} (${riderObj.name} [${riderObj.soulCode}]). ${ACTIVE_RIDERS.length} files in row.`;
         }
       };
 
@@ -629,15 +707,16 @@
         }
 
         const rowEntries = getRowManifest(activeRowIndex);
+        const totalFiles = rowEntries.length;
         setConnBadge(`LINK: PULLING ROW r${activeRowIndex}…`, false);
 
         let loaded = 0;
         try {
-          for (let i = 0; i < rowEntries.length; i++) {
+          for (let i = 0; i < totalFiles; i++) {
             const entry = rowEntries[i];
             if (status) {
               status.textContent =
-                `Pulling Row r${activeRowIndex}: file ${i + 1} / 8 (${entry.file} [${entry.soulKey}])…`;
+                `Pulling Row r${activeRowIndex}: file ${i + 1} / ${totalFiles} (${entry.file} [${entry.soulKey}])…`;
             }
             const ok = await loadMatchupMatrix(entry.p1, entry.p2, signal);
             if (ok) loaded++;
@@ -650,7 +729,7 @@
           setConnBadge(`LINK: CONNECTED (Row r${activeRowIndex})`, false);
           if (status) {
             status.textContent =
-              `Pulled ${loaded} / 8 files for Row r${activeRowIndex} (${ACTIVE_RIDERS_8[activeRowIndex].name}). Ready to train.`;
+              `Pulled ${loaded} / ${totalFiles} files for Row r${activeRowIndex} (${ACTIVE_RIDERS[activeRowIndex].name}). Ready to train.`;
           }
         } catch (err) {
           if (err?.name === "AbortError") {
@@ -687,21 +766,24 @@
         }
 
         const rowEntries = getRowManifest(activeRowIndex);
+        const totalFiles = rowEntries.length;
         setConnBadge(`LINK: SYNCING ROW r${activeRowIndex}…`, false);
 
         const results = [];
         let savedCount = 0;
 
         try {
-          for (let i = 0; i < rowEntries.length; i++) {
+          for (let i = 0; i < totalFiles; i++) {
             const entry = rowEntries[i];
             if (status) {
               status.textContent =
-                `Syncing Row r${activeRowIndex}: file ${i + 1} / 8 (${entry.file} [${entry.soulKey}]) → Drive…`;
+                `Syncing Row r${activeRowIndex}: file ${i + 1} / ${totalFiles} (${entry.file} [${entry.soulKey}]) → Drive…`;
             }
             const res = await saveMatchupMatrix(entry.p1, entry.p2, signal);
-            if (res?.ok !== false) savedCount++;
-            results.push({ key: entry.key, ok: true });
+            if (res && !res.skipped && res.ok !== false) {
+              savedCount++;
+            }
+            results.push({ key: entry.key, ok: true, skipped: Boolean(res?.skipped) });
           }
 
           renderActiveRowGrid();
@@ -710,7 +792,7 @@
           setConnBadge(`LINK: SYNCED (Row r${activeRowIndex})`, false);
           if (status) {
             status.textContent =
-              `Synced ${savedCount} / 8 files for Row r${activeRowIndex} to Google Drive. Click "3. Cut Connection & Purge Row RAM" before switching rows.`;
+              `Synced ${savedCount} trained files (of ${totalFiles} row slots) for Row r${activeRowIndex} to Google Drive. Click "3. Cut Connection & Purge Row RAM" before switching rows.`;
           }
         } catch (err) {
           if (err?.name === "AbortError") {
@@ -728,7 +810,9 @@
 
       g.MatrixStorage = {
         GDRIVE_FOLDER_ID,
-        ACTIVE_RIDERS_8,
+        MATRIX_SLOT_COUNT,
+        ACTIVE_RIDERS,
+        ACTIVE_RIDERS_8: ACTIVE_RIDERS,
         GOOGLE_APPS_SCRIPT_TEMPLATE,
         syncManifestWithDataset,
         resolveRiderIndex,
@@ -739,6 +823,8 @@
         loadMatchupMatrix,
         saveMatchupMatrix
       };
+
+      renderRowSelectOptions();
 
       if (g.SoulEnv?.setExecutionMode) {
         g.SoulEnv.setExecutionMode("train");
@@ -779,11 +865,11 @@
             if (res?.data?.riders) {
               g.MatrixStorage.syncManifestWithDataset(res.data.riders);
             }
-            g.render64MatrixHeaderGrid?.();
+            g.renderMatrixHeaderGrid?.();
           })
           .catch(() => {});
       }
-      g.render64MatrixHeaderGrid?.();
+      g.renderMatrixHeaderGrid?.();
     })(globalThis);
   </script>
 
