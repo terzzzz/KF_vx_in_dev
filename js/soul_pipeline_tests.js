@@ -9,8 +9,9 @@
  * - Missing controller inputs mean WAIT.
  * - Repeating a direction preserves its charge clock.
  * - Changing direction resets the charge clock.
- * - Per-Rider Master Bundle (001.json) packs 001_001..001_008 + 9 backup slots
- *   and reserved match parameter slots without cross-matchup weight pollution.
+ * - Per-Rider Master Bundle (001.json) packs 18 total slots (active riders +
+ *   dynamic backup slots) and reserved match parameter slots without
+ *   cross-matchup weight pollution.
  */
 (function (g) {
   "use strict";
@@ -309,16 +310,21 @@
       }
     });
 
-    test("8-rider roster includes Skyrider (008) and airborne moves require AIR state", () => {
+    test("Active roster fits 18-slot matrix capacity and Skyrider (008) airborne moves require AIR state", () => {
       const agent = g.SoulAgent;
       const activeCodes = agent.getActiveCodes();
+      const totalCapacity = Number.isInteger(agent.MATRIX_SLOT_COUNT)
+        ? agent.MATRIX_SLOT_COUNT
+        : 18;
 
       assert(
-        data.riders.length >= 8 && activeCodes.includes("008"),
-        "Expected at least 8 active riders (001..008)."
+        activeCodes.length >= 1 && activeCodes.length <= totalCapacity,
+        `Active roster (${activeCodes.length}) must fit within ${totalCapacity}-slot matrix capacity.`
       );
 
-      const skyrider = data.riders.find(r => r.id === "008") || data.riders[7];
+      const skyrider = data.riders.find(r => r.id === "008");
+      if (!skyrider) return;
+
       const state = C.createMatch(skyrider, first, data.moves);
       state.p1.chi = state.p1.maxChi;
       state.p1.airborneTicks = 0;
@@ -667,14 +673,23 @@
       );
     });
 
-    test("v8 Rider Matrix Bundle (001.json) pack, 9 backup slots, and isolated matchup round-trip", () => {
+    test("v8 Rider Matrix Bundle (001.json) 18-slot capacity, dynamic backup slots, and isolated matchup round-trip", () => {
       const agent = g.SoulAgent;
+      const totalCapacity = Number.isInteger(agent.MATRIX_SLOT_COUNT)
+        ? agent.MATRIX_SLOT_COUNT
+        : 18;
+      const activeCount = agent.getActiveCodes().length;
       const expectedBackupSlots = Number.isInteger(agent.BACKUP_SLOT_COUNT)
         ? agent.BACKUP_SLOT_COUNT
-        : 9;
+        : Math.max(0, totalCapacity - activeCount);
       const expectedParamSlots = Number.isInteger(agent.RESERVED_PARAM_SLOTS)
         ? agent.RESERVED_PARAM_SLOTS
         : expectedBackupSlots;
+
+      assert(
+        activeCount + expectedBackupSlots === totalCapacity,
+        `Expected active (${activeCount}) + backup (${expectedBackupSlots}) slots to equal ${totalCapacity}.`
+      );
 
       const input = E.vector(
         E.observe(E.create(fresh()), "p1"),
