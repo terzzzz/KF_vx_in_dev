@@ -1,9 +1,9 @@
 /* js/soul_agent.js
-- Exact-matchup checkpoint & 64-Matchup Matrix (data/matrix/matrix_r0_vs_r0.json .. r7_vs_r7.json) storage (v7).
+ * Exact-matchup checkpoint & 18x18-capacity Matrix (data/matrix/matrix_r0_vs_r0.json .. r17_vs_r17.json) storage.
  *
-- Build: v5-state256-action17
-- Matrix: v7-8riders-9backup (IndexedDB + data/matrix/ 64-Matrix Persistence)
-- Patch: charge1-reset1
+ * Build: v5-state256-action17
+ * Matrix: v8-18slot-dynamic-roster (IndexedDB + data/matrix/ Persistence)
+ * Patch: charge1-reset1
  */
 
 // Lift 5MB localStorage barrier into Unlimited Temp RAM
@@ -53,7 +53,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   const WORKER_VERSION = "kf-soul-ddqn-v5-state256-action17";
 
   const PATCH = "charge1-reset1";
-  const CACHE_TAG = VERSION + "-" + PATCH + "-v7";
+  const CACHE_TAG = VERSION + "-" + PATCH + "-v8";
 
   const EXPECTED_SCHEMA =
     "kf-state256-action17-v2-charge1-reset1";
@@ -65,10 +65,11 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   const IDB_VERSION = 1;
   const IDB_STORE = "matrix_store";
 
-  const ACTIVE_ROSTER_COUNT = 8;
-  const BACKUP_SLOT_COUNT = 9;
-  const RESERVED_PARAM_SLOTS = 10;
-  const TOTAL_MATRIX_SLOTS = ACTIVE_ROSTER_COUNT + BACKUP_SLOT_COUNT;
+  // Fixed 18-slot capacity (001..018); active vs. backup slots scale automatically with data.riders
+  const MATRIX_SLOT_COUNT = 18;
+  const DEFAULT_ACTIVE_ROSTER_COUNT = 8;
+  const RESERVED_PARAM_SLOTS = MATRIX_SLOT_COUNT;
+  const TOTAL_MATRIX_SLOTS = MATRIX_SLOT_COUNT;
 
   const DEFAULT_RIDER_CODES = Object.freeze({
     ichigo: "001",
@@ -87,7 +88,8 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
     shin: "014",
     zo: "015",
     j: "016",
-    kuuga: "017"
+    kuuga: "017",
+    agito: "018"
   });
 
   const RIDER_CODES = { ...DEFAULT_RIDER_CODES };
@@ -116,7 +118,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
 
   function getAllSlotCodes() {
     const codes = [];
-    for (let i = 1; i <= TOTAL_MATRIX_SLOTS; i++) {
+    for (let i = 1; i <= MATRIX_SLOT_COUNT; i++) {
       codes.push(formatCodeNumber(i));
     }
     return codes;
@@ -124,16 +126,18 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
 
   function getActiveCodes() {
     if (Array.isArray(cachedData?.riders) && cachedData.riders.length > 0) {
-      return cachedData.riders.map((rider, idx) => {
-        try {
-          return toCode(rider.id);
-        } catch (_) {
-          return formatCodeNumber(idx + 1);
-        }
-      });
+      return cachedData.riders
+        .slice(0, MATRIX_SLOT_COUNT)
+        .map((rider, idx) => {
+          try {
+            return toCode(rider.id);
+          } catch (_) {
+            return formatCodeNumber(idx + 1);
+          }
+        });
     }
     const codes = [];
-    for (let i = 1; i <= ACTIVE_ROSTER_COUNT; i++) {
+    for (let i = 1; i <= DEFAULT_ACTIVE_ROSTER_COUNT; i++) {
       codes.push(formatCodeNumber(i));
     }
     return codes;
@@ -141,15 +145,17 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
 
   function getBackupCodes() {
     const activeSet = new Set(getActiveCodes());
-    return getAllSlotCodes()
-      .filter(code => !activeSet.has(code))
-      .slice(0, BACKUP_SLOT_COUNT);
+    return getAllSlotCodes().filter(code => !activeSet.has(code));
+  }
+
+  function getBackupSlotCount() {
+    return getBackupCodes().length;
   }
 
   function syncRosterCodes(riders) {
     if (!Array.isArray(riders)) return;
 
-    riders.forEach((rider, index) => {
+    riders.slice(0, MATRIX_SLOT_COUNT).forEach((rider, index) => {
       const id = String(rider?.id || "").trim().toLowerCase();
       if (!id) return;
 
@@ -172,21 +178,21 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
 
     if (/^\d{3}$/.test(value)) {
       const idx = Number(value);
-      if (idx >= 1 && idx <= TOTAL_MATRIX_SLOTS) {
+      if (idx >= 1 && idx <= MATRIX_SLOT_COUNT) {
         return value;
       }
     }
 
     if (/^r(\d+)$/.test(value)) {
       const idx = Number(value.slice(1)) + 1;
-      if (idx >= 1 && idx <= TOTAL_MATRIX_SLOTS) {
+      if (idx >= 1 && idx <= MATRIX_SLOT_COUNT) {
         return formatCodeNumber(idx);
       }
     }
 
     if (/^(\d+)$/.test(value)) {
       const idx = Number(value) + 1;
-      if (idx >= 1 && idx <= TOTAL_MATRIX_SLOTS) {
+      if (idx >= 1 && idx <= MATRIX_SLOT_COUNT) {
         return formatCodeNumber(idx);
       }
     }
@@ -200,20 +206,20 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   }
 
   /**
-- Converts any rider identifier ("ichigo", "001", "r0", 0) to 0..16 index
-- where r0 = Ichigo (0) .. r6 = Stronger (6), r7 = Skyrider (7).
+   * Converts any rider identifier ("ichigo", "001", "r0", 0) to 0..17 index
+   * where r0 = Ichigo (0) .. r7 = Skyrider (7) .. r17 = Slot 18 (17).
    */
   function toRiderIndex(id) {
     if (
       typeof id === "number" &&
       Number.isInteger(id) &&
       id >= 0 &&
-      id < TOTAL_MATRIX_SLOTS
+      id < MATRIX_SLOT_COUNT
     ) {
       return id;
     }
     const code = toCode(id);
-    return Math.max(0, Math.min(TOTAL_MATRIX_SLOTS - 1, Number(code) - 1));
+    return Math.max(0, Math.min(MATRIX_SLOT_COUNT - 1, Number(code) - 1));
   }
 
   function getMatrixFileName(learner, opponent) {
@@ -463,7 +469,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       assertRuntime();
 
       if (!isRiderBundle(bundle)) {
-        throw new Error("Payload is not a v7 Rider Matrix Bundle.");
+        throw new Error("Payload is not a Rider Matrix Bundle.");
       }
 
       if (bundle.schema && bundle.schema !== EXPECTED_SCHEMA) {
@@ -483,7 +489,10 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       }
 
       const validMatchups = {};
-      const entries = Object.entries(bundle.matchups || {});
+      const entries = Object.entries({
+        ...(bundle.backupSlots || {}),
+        ...(bundle.matchups || {})
+      });
 
       for (const [rawKey, cp] of entries) {
         if (!cp) continue;
@@ -561,9 +570,16 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
         store[target]?.matchups?.[key] ||
         (fallbackToActive ? store.active?.matchups?.[key] : null) ||
         null;
-      backupSlots[key] = cp ? clone(cp) : null;
       if (cp) {
+        const copy = clone(cp);
+        copy.canonicalKey = key;
+        copy.matchParameters = createDefaultMatchParameters(copy.matchParameters);
+        backupSlots[key] = copy;
+        totalGames += copy.games || 0;
+        totalSteps += copy.steps || 0;
         populatedMatchups++;
+      } else {
+        backupSlots[key] = null;
       }
     }
 
@@ -583,6 +599,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       schema: EXPECTED_SCHEMA,
       learnerCode,
       learnerId,
+      matrixSlotCount: MATRIX_SLOT_COUNT,
       activeRosterCount: activeCodes.length,
       backupSlotCount: backupCodes.length,
       reservedParamSlotCount: RESERVED_PARAM_SLOTS,
@@ -597,7 +614,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
         neuralParamsPerMatchup: 42257,
         totalNeuralParamsInBundle: populatedMatchups * 42257,
         maxActiveBundleParams: activeCodes.length * 42257,
-        max17SlotBundleParams: TOTAL_MATRIX_SLOTS * 42257,
+        maxMatrixBundleParams: MATRIX_SLOT_COUNT * 42257,
         reservedSummarySlots: new Array(RESERVED_PARAM_SLOTS).fill(0)
       }
     };
@@ -777,7 +794,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       storage.setItem(STORAGE_KEY, JSON.stringify(payload));
       storageWarning = "";
     } catch (_) {
-      // IndexedDB + RAM hold all 64 matrices even when 5MB localStorage is full
+      // IndexedDB + RAM hold all matrices even when 5MB localStorage is full
       storageWarning = "";
     }
   }
@@ -838,11 +855,11 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   }
 
   /**
-- Builds candidate URLs for a 1v1 matchup:
-- 1. `data/matrix/matrix_r{A}_vs_r{B}.json` (Primary location in `data/matrix/`)
-- 2. `data/matrix/matrix_r{A}_r{B}.json`
-- 3. `data/matrix_r{A}_vs_r{B}.json`
-- 4. `data/matrix_r{A}_r{B}.json`
+   * Builds candidate URLs for a 1v1 matchup:
+   * 1. `data/matrix/matrix_r{A}_vs_r{B}.json` (Primary location in `data/matrix/`)
+   * 2. `data/matrix/matrix_r{A}_r{B}.json`
+   * 3. `data/matrix_r{A}_vs_r{B}.json`
+   * 4. `data/matrix_r{A}_r{B}.json`
    */
   function matchupMatrixURLs(learner, opponent) {
     const rA = toRiderIndex(learner);
@@ -1096,7 +1113,8 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       checkpoint: resolvedCheckpoint
     };
   }
-const attemptedRepoKeys = new Set();
+
+  const attemptedRepoKeys = new Set();
 
   /**
    * Fetches the exact 1v1 matchup file from `data/matrix/matrix_r{learner}_vs_r{opponent}.json`
@@ -1671,6 +1689,7 @@ const attemptedRepoKeys = new Set();
       fileName,
       key: bundle.learnerCode,
       populatedMatchups: bundle.riderParameterSummary.populatedMatchups,
+      matrixSlotCount: bundle.matrixSlotCount,
       activeRosterCount: bundle.activeRosterCount,
       backupSlotCount: bundle.backupSlotCount,
       sizeMB: (blob.size / 1048576).toFixed(2),
@@ -1733,8 +1752,9 @@ const attemptedRepoKeys = new Set();
       workerVersion: WORKER_VERSION,
       storageKey: STORAGE_KEY,
 
+      matrixSlotCount: MATRIX_SLOT_COUNT,
       activeRosterCount: getActiveCodes().length,
-      backupSlotCount: BACKUP_SLOT_COUNT,
+      backupSlotCount: getBackupSlotCount(),
       reservedParamSlotCount: RESERVED_PARAM_SLOTS,
       foresightConfig: getForesightConfig(),
 
@@ -1758,8 +1778,14 @@ const attemptedRepoKeys = new Set();
     BUNDLE_VERSION,
     WORKER_VERSION,
     PATCH,
-    ACTIVE_ROSTER_COUNT,
-    BACKUP_SLOT_COUNT,
+    MATRIX_SLOT_COUNT,
+    TOTAL_MATRIX_SLOTS,
+    get ACTIVE_ROSTER_COUNT() {
+      return getActiveCodes().length;
+    },
+    get BACKUP_SLOT_COUNT() {
+      return getBackupSlotCount();
+    },
     RESERVED_PARAM_SLOTS,
 
     ready,
@@ -1771,6 +1797,7 @@ const attemptedRepoKeys = new Set();
     formatCodeNumber,
     getActiveCodes,
     getBackupCodes,
+    getBackupSlotCount,
     getAllSlotCodes,
     syncRosterCodes,
     getCanonicalKey,
