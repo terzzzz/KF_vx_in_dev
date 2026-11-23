@@ -1,7 +1,7 @@
 /* js/training_worker.js
  * Kamen Fight
  * Build: v5-state256-action17
- * Matrix: v8-8riders-9backup (Sequential 1-Cell-at-a-Time Low-Memory Worker)
+ * Matrix: v8-18slot-dynamic-roster (Sequential 1-Cell-at-a-Time Low-Memory Worker)
  * Patch: charge1-reset1
  */
 "use strict";
@@ -305,10 +305,11 @@ async function run(job) {
   const hiddenSizes = spec.hidden.slice();
   const seed = job.seed >>> 0;
 
-  const activeRowRiders = data.riders.slice(0, 8);
+  const maxSlots = SoulAgent.MATRIX_SLOT_COUNT || 18;
+  const activeRowRiders = data.riders.slice(0, maxSlots);
   const learnerRider = activeRowRiders.find(rider => rider.id === job.learner);
   if (!learnerRider) {
-    throw new Error("Selected learner rider is absent from the active 8-rider roster.");
+    throw new Error(`Selected learner rider is absent from the active ${activeRowRiders.length}-rider roster.`);
   }
 
   const isMultiOpponent = job.opponent === "*";
@@ -323,7 +324,7 @@ async function run(job) {
   if (targetOpponentRiders.length === 0) {
     throw new Error(
       training
-        ? "No opponent riders found in active 8-rider roster."
+        ? `No opponent riders found in active ${activeRowRiders.length}-rider roster.`
         : "No checkpoints exist to evaluate for this learner."
     );
   }
