@@ -6,7 +6,7 @@
 
 const BUILD = "v5-state256-action17";
 const PATCH = "charge1-reset1";
-const CACHE_TAG = BUILD + "-" + PATCH;
+const CACHE_TAG = BUILD + "-" + PATCH + "-v8";
 const EXPECTED_SCHEMA =
   "kf-state256-action17-v2-charge1-reset1";
 
