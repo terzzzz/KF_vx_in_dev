@@ -572,6 +572,143 @@
     "A+K": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
     "A+L": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" }
   },
+  "super_1": {
+    "W+I": {
+      "name": "Super Jump",
+      "type": "UTILITY",
+      "chiCost": 0,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "jump.mp4",
+      "grantsAirborne": 3,
+      "buff": {
+        "id": "airborne_boost",
+        "label": "AIR",
+        "type": "speed",
+        "duration": 3,
+        "effects": { "evasion": 0.25, "speed": 1.2 }
+      }
+    },
+    "W+J": {
+      "name": "Radar Hand Lock-On",
+      "type": "UTILITY",
+      "chiCost": 1,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "radar_hand.mp4",
+      "buff": {
+        "id": "true_sight",
+        "label": "TRUE SIGHT",
+        "type": "accuracy",
+        "duration": 3,
+        "effects": { "accuracy": 35 }
+      }
+    },
+    "W+K": {
+      "name": "Cold Hand Cryo Spray",
+      "type": "SPECIAL",
+      "rangeType": "REACH",
+      "chiCost": 2,
+      "baseDamage": 45,
+      "hitChance": 82,
+      "video": "cold_hand.mp4",
+      "debuff": {
+        "id": "cold_slow",
+        "label": "SLOW",
+        "type": "speed",
+        "duration": 3,
+        "refreshable": true,
+        "effects": { "speed": 0.7 }
+      }
+    },
+    "W+L": {
+      "name": "Sekishin Meditation",
+      "type": "UTILITY",
+      "chiCost": 0,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "mind.mp4",
+      "faintRecovery": 42
+    },
+    "D+J": { "name": "Super Hand Jab", "type": "PHYSICAL", "chiCost": 0, "baseDamage": 42, "hitChance": 80, "video": "punch.mp4" },
+    "D+K": { "name": "Shorinji Kick", "type": "PHYSICAL", "chiCost": 0, "baseDamage": 45, "hitChance": 79, "video": "kick.mp4" },
+    "D+L": {
+      "name": "Power Hand Crush",
+      "type": "PHYSICAL",
+      "chiCost": 1,
+      "baseDamage": 72,
+      "hitChance": 78,
+      "video": "power_hand.mp4",
+      "debuff": {
+        "id": "armor_break",
+        "label": "ARMOR BREAK",
+        "type": "defense",
+        "duration": 3,
+        "refreshable": true,
+        "effects": { "damageTakenMult": 1.20 }
+      }
+    },
+    "D+I": {
+      "name": "Elek Hand Shock",
+      "type": "PHYSICAL",
+      "chiCost": 1,
+      "chiDrainOnHit": 1,
+      "baseDamage": 64,
+      "baseFaintDamage": 22,
+      "hitChance": 79,
+      "video": "elek_hand.mp4"
+    },
+    "S+J": {
+      "name": "Elek Beam",
+      "type": "SPECIAL",
+      "rangeType": "REACH",
+      "chiCost": 3,
+      "chiDrainOnHit": 2,
+      "baseDamage": 270,
+      "baseFaintDamage": 26,
+      "hitChance": 78,
+      "video": "elek_beam.mp4"
+    },
+    "S+K": {
+      "name": "Power Hand Smash",
+      "type": "SPECIAL",
+      "chiCost": 5,
+      "chiRefundOnHit": 1,
+      "baseDamage": 360,
+      "hitChance": 76,
+      "video": "power_smash.mp4",
+      "debuff": {
+        "id": "armor_break",
+        "label": "ARMOR BREAK",
+        "type": "defense",
+        "duration": 3,
+        "refreshable": true,
+        "effects": { "damageTakenMult": 1.20 }
+      }
+    },
+    "S+L": {
+      "name": "Super Rider Moon Surface Kick",
+      "type": "SPECIAL",
+      "chiCost": 7,
+      "chiRefundOnHit": 3,
+      "baseDamage": 560,
+      "hitChance": 76,
+      "video": "moon_kick.mp4"
+    },
+    "S+I": {
+      "name": "Super Rider Lightning Sword",
+      "type": "SPECIAL",
+      "chiCost": 9,
+      "chiRefundOnHit": 4,
+      "baseDamage": 720,
+      "hitChance": 77,
+      "video": "lightning_sword.mp4"
+    },
+    "A+I": { "name": "Five Hands Parry", "type": "DEFENSE", "guardKind": "omni", "chiCost": 4, "baseDamage": 0, "hitChance": 100, "video": "omni_guard.mp4" },
+    "A+J": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
+    "A+K": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
+    "A+L": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" }
+  },
   "movelists": {
     "ichigo": {
       "id": "ichigo",
@@ -1179,6 +1316,84 @@
         ],
         "defense": [
           { "name": "防守", "cmd": "A+I, A+J, A+K, A+L", "chi": 0, "effect": "分別防禦 I、J、K 與 L 攻擊", "remarks": "" }
+        ]
+      }
+    },
+    "super_1": {
+      "id": "super_1",
+      "en": {
+        "name": "Kamen Rider Super-1",
+        "basic": [
+          { "name": "Hand Jab", "cmd": "D+J", "chi": 0, "dmg": 42, "remarks": "Gain 2 CHI if hit" },
+          { "name": "Shorinji Kick", "cmd": "D+K", "chi": 0, "dmg": 45, "remarks": "Gain 2 CHI if hit" },
+          { "name": "Power Hand Crush", "cmd": "D+L", "chi": 1, "dmg": 72, "remarks": "Gain 3 CHI if hit, reduce target defense for 3 rounds" },
+          { "name": "Elek Hand Shock", "cmd": "D+I", "chi": 1, "dmg": 64, "remarks": "Gain 3 CHI if hit, drain 1 CHI, build faint" }
+        ],
+        "special": [
+          { "name": "Elek Beam", "cmd": "S+J", "chi": 3, "dmg": 270, "remarks": "Long reach, drain 2 CHI, build faint" },
+          { "name": "Power Hand Smash", "cmd": "S+K", "chi": 5, "dmg": 360, "remarks": "Reduce target defense for 3 rounds" },
+          { "name": "Super Rider Moon Surface Kick", "cmd": "S+L", "chi": 7, "dmg": 560, "remarks": "" },
+          { "name": "Super Rider Lightning Sword", "cmd": "S+I", "chi": 9, "dmg": 720, "remarks": "" }
+        ],
+        "utilities": [
+          { "name": "Super Jump", "cmd": "W+I", "chi": 0, "effect": "Buff charge speed and evasion", "remarks": "Last 3 rounds" },
+          { "name": "Radar Hand Lock-On", "cmd": "W+J", "chi": 1, "effect": "Buff accuracy", "remarks": "Last 3 rounds" },
+          { "name": "Cold Hand Cryo Spray", "cmd": "W+K", "chi": 2, "effect": "Slows opponent charge speed for 3 rounds", "remarks": "Long reach, deals damage" },
+          { "name": "Sekishin Meditation", "cmd": "W+L", "chi": 0, "effect": "Decrease faint", "remarks": "" }
+        ],
+        "defense": [
+          { "name": "Five Hands Parry", "cmd": "A+I", "chi": 4, "effect": "Defense against all attacks", "remarks": "" },
+          { "name": "Standard Guard", "cmd": "A+J, A+K, A+L", "chi": 0, "effect": "Defense against J, K & L attacks respectively", "remarks": "" }
+        ]
+      },
+      "ja": {
+        "name": "仮面ライダースーパー1",
+        "basic": [
+          { "name": "ハンドジャブ", "cmd": "D+J", "chi": 0, "dmg": 42, "remarks": "ヒット時、氣+2" },
+          { "name": "少林寺キック", "cmd": "D+K", "chi": 0, "dmg": 45, "remarks": "ヒット時、氣+2" },
+          { "name": "パワーハンドクラッシュ", "cmd": "D+L", "chi": 1, "dmg": 72, "remarks": "ヒット時、氣+3・3ラウンドの間、相手の防御力を低下" },
+          { "name": "エレキハンドショック", "cmd": "D+I", "chi": 1, "dmg": 64, "remarks": "ヒット時、氣+3・氣を1吸収・気絶値蓄積" }
+        ],
+        "special": [
+          { "name": "エレキ光線", "cmd": "S+J", "chi": 3, "dmg": 270, "remarks": "遠距離リーチ・氣を2吸収・気絶値蓄積" },
+          { "name": "パワーハンドスマッシュ", "cmd": "S+K", "chi": 5, "dmg": 360, "remarks": "3ラウンドの間、相手の防御力を低下" },
+          { "name": "スーパーライダー月面キック", "cmd": "S+L", "chi": 7, "dmg": 560, "remarks": "" },
+          { "name": "スーパーライダー稲妻閃光剣", "cmd": "S+I", "chi": 9, "dmg": 720, "remarks": "" }
+        ],
+        "utilities": [
+          { "name": "ジャンプ", "cmd": "W+I", "chi": 0, "effect": "チャージ速度・回避率アップ", "remarks": "3ラウンド持続" },
+          { "name": "レーダーハンド・ロックオン", "cmd": "W+J", "chi": 1, "effect": "命中率アップ", "remarks": "3ラウンド持続" },
+          { "name": "冷熱ハンド・冷凍ガス", "cmd": "W+K", "chi": 2, "effect": "3ラウンドの間、相手のチャージ速度を低下", "remarks": "遠距離リーチ・ダメージを与える" },
+          { "name": "赤心瞑想", "cmd": "W+L", "chi": 0, "effect": "気絶値を減少", "remarks": "" }
+        ],
+        "defense": [
+          { "name": "ファイブハンド・パリィ", "cmd": "A+I", "chi": 4, "effect": "すべての攻撃を防御", "remarks": "" },
+          { "name": "通常ガード", "cmd": "A+J, A+K, A+L", "chi": 0, "effect": "J・K・L攻撃をそれぞれ防御", "remarks": "" }
+        ]
+      },
+      "zh": {
+        "name": "假面騎士Super-1",
+        "basic": [
+          { "name": "手刺拳", "cmd": "D+J", "chi": 0, "dmg": 42, "remarks": "命中時氣+2" },
+          { "name": "少林寺踢", "cmd": "D+K", "chi": 0, "dmg": 45, "remarks": "命中時氣+2" },
+          { "name": "強力手粉碎", "cmd": "D+L", "chi": 1, "dmg": 72, "remarks": "命中時氣+3、降低對手防禦力3回合" },
+          { "name": "電氣手電擊", "cmd": "D+I", "chi": 1, "dmg": 64, "remarks": "命中時氣+3、吸取1點氣、累積暈眩值" }
+        ],
+        "special": [
+          { "name": "電氣光線", "cmd": "S+J", "chi": 3, "dmg": 270, "remarks": "遠距離攻擊、吸取2點氣、累積暈眩值" },
+          { "name": "強力手重擊", "cmd": "S+K", "chi": 5, "dmg": 360, "remarks": "降低對手防禦力3回合" },
+          { "name": "超級騎士月面踢", "cmd": "S+L", "chi": 7, "dmg": 560, "remarks": "" },
+          { "name": "超級騎士閃電劍", "cmd": "S+I", "chi": 9, "dmg": 720, "remarks": "" }
+        ],
+        "utilities": [
+          { "name": "超級跳躍", "cmd": "W+I", "chi": 0, "effect": "提升蓄力速度與迴避率", "remarks": "持續3回合" },
+          { "name": "雷達手鎖定", "cmd": "W+J", "chi": 1, "effect": "提升命中率", "remarks": "持續3回合" },
+          { "name": "冷熱手冷凍噴霧", "cmd": "W+K", "chi": 2, "effect": "使對手蓄力速度降低3回合", "remarks": "遠距離攻擊、造成傷害" },
+          { "name": "赤心冥想", "cmd": "W+L", "chi": 0, "effect": "降低暈眩值", "remarks": "" }
+        ],
+        "defense": [
+          { "name": "五能手格擋", "cmd": "A+I", "chi": 4, "effect": "防禦所有攻擊", "remarks": "" },
+          { "name": "防守", "cmd": "A+J, A+K, A+L", "chi": 0, "effect": "分別防禦 J、K 與 L 攻擊", "remarks": "" }
         ]
       }
     }
