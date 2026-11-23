@@ -76,7 +76,10 @@
 
   const DEBUFF_STATUS_SET = new Set([
     "rope_bind",
-    "bleeding"
+    "bleeding",
+    "paralyze_shock",
+    "cold_slow",
+    "armor_break"
   ]);
 
   const BUFF_STATUS_SET = new Set(
@@ -317,7 +320,7 @@
       move.direction === "W" ||
       (statusId && BUFF_STATUS_SET.has(statusId)) ||
       number(move.lpRegen ?? effects.lpRegen, 0) > 0 ||
-      number(effects.chiDrainOnHit, 0) > 0 ||
+      number(move.chiDrainOnHit ?? effects.chiDrainOnHit, 0) > 0 ||
       (target !== "enemy" && (
         number(effects.attack, 1) > 1 ||
         number(effects.dAttack, 1) > 1 ||
@@ -495,6 +498,15 @@
       ev += 1.25;
     }
 
+    // CHI drain value on clean hit (e.g., Super-1 D+I / S+J)
+    const drainedChi = Math.min(
+      number(simEnemy.chi, 0),
+      Math.max(0, number(move.chiDrainOnHit, 0))
+    );
+    if (drainedChi > 0) {
+      ev += 0.08 * drainedChi * hitProb;
+    }
+
     // Tactical Buff evaluation
     if (role.isBuff) {
       const alreadyBuffed = (simSelf.activeBuffs || []).some(
@@ -526,8 +538,9 @@
     }
 
     // Penalize dropping self into < 5 Low CHI penalty zone unless lethal or buffing
+    const refundedChi = number(move.chiRefundOnHit, 0) + drainedChi;
     const nextChi = K.clamp(
-      simSelf.chi - cost + number(move.chiGain ?? (cost === 0 ? 2 : 0), 0),
+      simSelf.chi - cost + number(move.chiGain ?? (cost === 0 ? 2 : 0), 0) + refundedChi,
       0,
       CHI_MAX_ORTHOGONAL
     );
@@ -544,9 +557,14 @@
 
   function projectSimulatedPair(simSelf, simEnemy, key, move) {
     const cost = moveChiCost(move);
+    const drainedChi = Math.min(
+      number(simEnemy.chi, 0),
+      Math.max(0, number(move?.chiDrainOnHit, 0))
+    );
+    const refundedChi = number(move?.chiRefundOnHit, 0) + drainedChi;
     const chiGain = key === "DO_NOTHING"
       ? 2
-      : number(move?.chiGain, cost === 0 ? 2 : 0);
+      : number(move?.chiGain, cost === 0 ? 2 : 0) + refundedChi;
 
     const nextSelfChi = K.clamp(
       simSelf.chi - cost + chiGain,
@@ -598,7 +616,7 @@
       nextEnemyBuffs.push({
         id: role.statusId || "bleeding",
         roundsLeft: number(move?.duration ?? move?.rounds, 3),
-        effects: move?.effects || move?.targetDebuff?.effects || { armor: 0.80, lpBleed: 80 }
+        effects: move?.effects || move?.debuff?.effects || move?.targetDebuff?.effects || { armor: 0.80, lpBleed: 80 }
       });
     }
 
@@ -616,7 +634,7 @@
       },
       nextEnemy: {
         ...simEnemy,
-        chi: K.clamp(simEnemy.chi + 1, 0, CHI_MAX_ORTHOGONAL),
+        chi: K.clamp(simEnemy.chi - drainedChi + 1, 0, CHI_MAX_ORTHOGONAL),
         lp: Math.max(0, simEnemy.lp - estDmg),
         activeBuffs: nextEnemyBuffs
       }
@@ -1248,7 +1266,7 @@
       mods.attack,
       mods.dAttack,
       mods.sAttack,
-      mods.armor,
+      mods.armor * number(mods.damageTakenMult, 1),
       mods.speed,
       mods.accuracy / 100,
       mods.evasion,
