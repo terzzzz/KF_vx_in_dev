@@ -275,28 +275,31 @@
       move.statusId ||
       move.buffId ||
       move.debuffId ||
-      move.buff?.id ||
       move.debuff?.id ||
+      move.targetDebuff?.id ||
+      move.buff?.id ||
       move.effects?.statusId ||
       null;
 
-    const effects = move.effects || move.buff?.effects || {};
+    const effects = move.effects || move.buff?.effects || move.targetDebuff?.effects || {};
     const target = String(move.target || move.buff?.target || "").toLowerCase();
     const kind = String(move.type || move.category || move.kind || "").toLowerCase();
 
     const hasDebuffEffect =
-      Boolean(move.isDebuff || move.debuff) ||
+      Boolean(move.isDebuff || move.debuff || move.targetDebuff) ||
       kind.includes("debuff") ||
       kind.includes("bind") ||
       kind.includes("bleed") ||
       (statusId && DEBUFF_STATUS_SET.has(statusId)) ||
       number(move.lpBleed ?? effects.lpBleed, 0) > 0 ||
       number(move.faintDamage ?? move.faint ?? effects.faint, 0) >= 25 ||
+      number(effects.damageTakenMult, 1) > 1 ||
       (target === "enemy" && (
         number(effects.attack, 1) < 1 ||
         number(effects.armor, 1) < 1 ||
         number(effects.speed, 1) < 1 ||
-        number(effects.evasion, 0) < 0
+        number(effects.evasion, 0) < 0 ||
+        number(effects.damageTakenMult, 1) > 1
       ));
 
     const hasBuffEffect =
@@ -304,7 +307,9 @@
         move.isBuff ||
         move.buff ||
         move.enableSpecials ||
-        effects.enableSpecials
+        effects.enableSpecials ||
+        move.grantsAirborne ||
+        move.airborne
       ) ||
       kind.includes("buff") ||
       kind.includes("stance") ||
@@ -312,6 +317,7 @@
       move.direction === "W" ||
       (statusId && BUFF_STATUS_SET.has(statusId)) ||
       number(move.lpRegen ?? effects.lpRegen, 0) > 0 ||
+      number(effects.chiDrainOnHit, 0) > 0 ||
       (target !== "enemy" && (
         number(effects.attack, 1) > 1 ||
         number(effects.dAttack, 1) > 1 ||
@@ -459,7 +465,7 @@
     const enemyMods = C.modifiers(simEnemy, simEnemy.chi);
     const role = classifyMoveTacticalRole(key, move);
 
-    const maxLp = Math.max(1, number(simEnemy.maxLp, 2500));
+    const maxLp = Math.max(1, number(simEnemy.maxLp, 1600));
     const baseDmg = number(
       move.damage ?? move.power ?? move.baseDamage,
       move.direction === "S" ? 360 : move.direction === "D" ? 240 : move.direction === "A" ? 150 : 60
@@ -471,8 +477,9 @@
         ? selfMods.dAttack
         : 1;
 
+    const enemyDmgTakenMult = Math.max(0.5, number(enemyMods.damageTakenMult, 1));
     const effectiveDmg =
-      (baseDmg * selfMods.attack * dirMult) /
+      (baseDmg * selfMods.attack * dirMult * enemyDmgTakenMult) /
       Math.max(0.35, enemyMods.armor);
 
     const hitProb = K.clamp(
@@ -556,12 +563,34 @@
       .map(b => ({ ...b, roundsLeft: Math.max(0, number(b.roundsLeft, 0) - 1) }))
       .filter(b => b.roundsLeft > 0);
 
+    let nextAirborneTicks = Math.max(0, number(simSelf.airborneTicks, 0) - 1);
+
     if (role.isBuff) {
+      const unlocksSpecials = Boolean(
+        move?.enableSpecials ||
+        move?.buff?.enableSpecials ||
+        move?.effects?.enableSpecials
+      );
+      const grantsAir = Boolean(
+        move?.grantsAirborne ||
+        move?.airborne ||
+        move?.buff?.grantsAirborne ||
+        role.statusId === "airborne_evasion" ||
+        role.statusId === "airborne_boost"
+      );
+
+      if (grantsAir) {
+        nextAirborneTicks = Math.max(
+          nextAirborneTicks,
+          number(move?.airborneTicks ?? move?.duration ?? move?.rounds, 2)
+        );
+      }
+
       nextSelfBuffs.push({
         id: role.statusId || "power_focus",
         roundsLeft: number(move?.duration ?? move?.rounds, 3),
-        enableSpecials: Boolean(move?.enableSpecials || move?.direction === "W"),
-        effects: move?.effects || { attack: 1.25, speed: 1.15 }
+        enableSpecials: unlocksSpecials,
+        effects: move?.effects || move?.buff?.effects || { attack: 1.25, speed: 1.15 }
       });
     }
 
@@ -569,12 +598,12 @@
       nextEnemyBuffs.push({
         id: role.statusId || "bleeding",
         roundsLeft: number(move?.duration ?? move?.rounds, 3),
-        effects: move?.effects || { armor: 0.80, lpBleed: 80 }
+        effects: move?.effects || move?.targetDebuff?.effects || { armor: 0.80, lpBleed: 80 }
       });
     }
 
     const stepEv = estimateMoveImmediateEv(simSelf, simEnemy, key, move);
-    const estDmg = Math.max(0, stepEv * Math.max(1, number(simEnemy.maxLp, 2500)) * 0.55);
+    const estDmg = Math.max(0, stepEv * Math.max(1, number(simEnemy.maxLp, 1600)) * 0.55);
 
     return {
       stepEv,
@@ -582,6 +611,7 @@
         ...simSelf,
         chi: nextSelfChi,
         lp: Math.max(0, simSelf.lp - 95),
+        airborneTicks: nextAirborneTicks,
         activeBuffs: nextSelfBuffs
       },
       nextEnemy: {
@@ -654,6 +684,20 @@
       });
     }
 
+    // Include DO_NOTHING when CHI-starved so the planner can schedule CHI recovery -> S-move
+    if (
+      number(self.chi, 0) < LOW_CHI_THRESHOLD &&
+      (typeof C?.isLegal !== "function" || C.isLegal(state, slot, idle()))
+    ) {
+      const idleSim = projectSimulatedPair(self, enemy, "DO_NOTHING", null);
+      rootCandidates.push({
+        sequence: [IDLE_INDEX],
+        totalEv: idleSim.stepEv,
+        simSelf: idleSim.nextSelf,
+        simEnemy: idleSim.nextEnemy
+      });
+    }
+
     if (rootCandidates.length === 0) {
       return {
         createdAtRound: currentRound,
@@ -694,13 +738,20 @@
           continue;
         }
 
+        const simState = {
+          ...state,
+          [slot]: branch.simSelf,
+          [enemySlot]: branch.simEnemy
+        };
+
         for (let idx = 0; idx < IDLE_INDEX; idx++) {
           const key = ACTION_MAP[idx];
           const move = slotMoves[key];
           if (!move) continue;
 
-          const cost = moveChiCost(move);
-          if (branch.simSelf.chi < cost) continue;
+          if (!isMoveAffordableAndLegal(simState, slot, key, move)) {
+            continue;
+          }
 
           const sim = projectSimulatedPair(
             branch.simSelf,
@@ -1136,7 +1187,7 @@
       selfChi: self.chi,
       enemyChi: enemy.chi,
       selfMaxChi: self.maxChi,
-      enemyMaxChi: enemy.maxChi,
+      enemyMaxChi: self.maxChi,
       historyFrames,
       rollingStances,
       selfChiOrthogonal,
