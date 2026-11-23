@@ -86,7 +86,7 @@
     "icon": "assets/images/icons/skyrider.png",
     "videoFolder": "assets/videos/skyrider/",
     "finisher": "Three-Point Drop / Sky Kick",
-    "active": false
+    "active": true
   },
   {
     "id": "super_1",
@@ -97,6 +97,6 @@
     "icon": "assets/images/icons/super_1.png",
     "videoFolder": "assets/videos/super_1/",
     "finisher": "Super Rider Lightning Sword / Super Rider Moon Surface Kick",
-    "active": false
+    "active": true
   }
 ]
