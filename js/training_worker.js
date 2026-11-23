@@ -1,7 +1,8 @@
 /* js/training_worker.js
-- Build: v5-state256-action17
-- Matrix: v8-8riders-9backup (Sequential 1-Cell-at-a-Time Low-Memory Worker)
-- Patch: charge1-reset1
+ * Kamen Fight
+ * Build: v5-state256-action17
+ * Matrix: v8-8riders-9backup (Sequential 1-Cell-at-a-Time Low-Memory Worker)
+ * Patch: charge1-reset1
  */
 "use strict";
 
@@ -261,6 +262,13 @@ function updateMatchParameters(params, prevTotalGames, metrics, wasdCounts, jkil
   updated.faintInflictedRate = blendParameter(updated.faintInflictedRate, prevTotalGames, metrics.faintInflicted);
   updated.faintSufferedRate = blendParameter(updated.faintSufferedRate, prevTotalGames, metrics.faintSuffered);
 
+  if (Number.isFinite(metrics.armorBreakAppliedRate)) {
+    updated.armorBreakAppliedRate = blendParameter(updated.armorBreakAppliedRate, prevTotalGames, metrics.armorBreakAppliedRate);
+  }
+  if (Number.isFinite(metrics.chiDrainedPerRound)) {
+    updated.avgChiDrained = blendParameter(updated.avgChiDrained, prevTotalGames, metrics.chiDrainedPerRound);
+  }
+
   const stanceTotal = Math.max(
     1,
     (wasdCounts.W || 0) + (wasdCounts.A || 0) + (wasdCounts.S || 0) + (wasdCounts.D || 0) + (wasdCounts.IDLE || 0)
@@ -297,24 +305,25 @@ async function run(job) {
   const hiddenSizes = spec.hidden.slice();
   const seed = job.seed >>> 0;
 
-  const learnerRider = data.riders.find(rider => rider.id === job.learner);
+  const activeRowRiders = data.riders.slice(0, 8);
+  const learnerRider = activeRowRiders.find(rider => rider.id === job.learner);
   if (!learnerRider) {
-    throw new Error("Selected learner rider is absent from the dataset.");
+    throw new Error("Selected learner rider is absent from the active 8-rider roster.");
   }
 
   const isMultiOpponent = job.opponent === "*";
   const targetOpponentRiders = isMultiOpponent
-    ? data.riders.filter(r => {
+    ? activeRowRiders.filter(r => {
         if (training) return true;
         const key = SoulAgent.getCanonicalKey(job.learner, r.id);
         return Boolean(job.checkpointsByMatchup?.[key]);
       })
-    : [data.riders.find(r => r.id === job.opponent)].filter(Boolean);
+    : [activeRowRiders.find(r => r.id === job.opponent)].filter(Boolean);
 
   if (targetOpponentRiders.length === 0) {
     throw new Error(
       training
-        ? "No opponent riders found in dataset."
+        ? "No opponent riders found in active 8-rider roster."
         : "No checkpoints exist to evaluate for this learner."
     );
   }
@@ -355,6 +364,10 @@ async function run(job) {
   let qCount = 0;
   let totalUpdates = 0;
   let latestLoss = 0;
+  let singleBaseGames = 0;
+  let singleWeightsID = null;
+  let singleLoadedWeightsID = null;
+  let singleCellParams = null;
   const aggUpdateStats = { win: 0, damage: 0, loss: 0, neutral: 0 };
 
   let guideProbability = 0;
@@ -445,6 +458,12 @@ async function run(job) {
     const loadedWeightsID = !training
       ? String(KF.hash(JSON.stringify(net.toJSON())))
       : weightsID;
+
+    if (!isMultiOpponent) {
+      singleBaseGames = baseGames;
+      singleWeightsID = weightsID;
+      singleLoadedWeightsID = loadedWeightsID;
+    }
 
     let cellGames = 0;
     let cellWins = 0;
@@ -806,6 +825,10 @@ async function run(job) {
       send("checkpoint", { checkpoint: buildCellCheckpoint() });
     }
 
+    if (!isMultiOpponent) {
+      singleCellParams = SoulAgent.createDefaultMatchParameters(cellParams);
+    }
+
     if (!training && cellGames >= 2 && cellGames % 2 === 0) {
       const seconds = Math.max(0.001, (performance.now() - started) / 1000);
       matchupReports.push({
@@ -879,9 +902,9 @@ async function run(job) {
       updates: totalUpdates,
       updateStats: training ? aggUpdateStats : null,
       avgQ: qCount ? qSum / qCount : 0,
-      totalTrainingGames: games,
-      weightsID: "ROW-SEQUENTIAL",
-      loadedWeightsID: "ROW-SEQUENTIAL",
+      totalTrainingGames: !isMultiOpponent ? singleBaseGames + (training ? games : 0) : games,
+      weightsID: !isMultiOpponent ? singleWeightsID : "ROW-SEQUENTIAL",
+      loadedWeightsID: !isMultiOpponent ? singleLoadedWeightsID : "ROW-SEQUENTIAL",
       teacher: training ? job.teacher : null,
       guidePct: Number.isFinite(job.guidePct) ? job.guidePct : null,
       guideProbability,
@@ -901,7 +924,7 @@ async function run(job) {
       warmStart: job.warmStart,
       hiddenSizes,
       cancelled,
-      matchParameters: null,
+      matchParameters: !isMultiOpponent ? singleCellParams : null,
       matchupReports,
       breakdown,
       firstWinningGames,
