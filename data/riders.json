@@ -87,5 +87,16 @@
     "videoFolder": "assets/videos/skyrider/",
     "finisher": "Three-Point Drop / Sky Kick",
     "active": false
+  },
+  {
+    "id": "super_1",
+    "name": "Kamen Rider Super-1",
+    "sourceFacing": "right",
+    "maxLp": 3100,
+    "archetype": "Five Hands Tactical / Martial Artist",
+    "icon": "assets/images/icons/super_1.png",
+    "videoFolder": "assets/videos/super_1/",
+    "finisher": "Super Rider Lightning Sword / Super Rider Moon Surface Kick",
+    "active": false
   }
 ]
