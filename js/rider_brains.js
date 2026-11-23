@@ -1,7 +1,7 @@
 /* js/rider_brains.js
-- Kamen Fight
-- Rider Tactical Brains, Heuristic Evaluator & Move Priors
-- Build: v5-state256-action17 (charge1-reset1 + dynamo + airborne compatible)
+ * Kamen Fight
+ * Rider Tactical Brains, Heuristic Evaluator & Move Priors
+ * Build: v5-state256-action17 (charge1-reset1 + dynamo + airborne compatible)
  */
 (function (g) {
   "use strict";
@@ -64,8 +64,8 @@
   }
 
   /*
-- Summarizes active buffs/debuffs on a fighter across all status formats
-- used by CombatCore (including activeBuffs[].effects).
+   * Summarizes active buffs/debuffs on a fighter across all status formats
+   * used by CombatCore (including activeBuffs[].effects).
    */
   function summarizeStatuses(fighter) {
     const summary = {
@@ -76,10 +76,14 @@
       regen: 0,
       debuff: 0,
       positiveCount: 0,
+      damageTakenMult: 1,
+      chiDrainOnHit: 0,
       hasPowerBuff: false,
       hasDefenseBuff: false,
       hasSpeedBuff: false,
       hasRegenBuff: false,
+      hasArmorBreak: false,
+      hasChiDrain: false,
       hasSpecialsEnabled: false,
       specialsRoundsLeft: 0,
       isAirborne: false,
@@ -170,7 +174,7 @@
         summary.debuff += (1 - speedMult) * 185 * turnFactor;
       }
 
-      // 4. Armor / Damage Taken modifiers (armor < 1 means reduced incoming damage)
+      // 4. Armor & Armor Break (damageTakenMult) modifiers
       const armorMult = Number(mods.armor ?? 1);
       if (armorMult > 0 && armorMult < 0.99) {
         summary.guard += (1 - armorMult) * 240 * turnFactor;
@@ -178,6 +182,33 @@
         isPositive = true;
       } else if (armorMult > 1.01) {
         summary.debuff += (armorMult - 1) * 210 * turnFactor;
+      }
+
+      const dmgTakenMult = Number(
+        mods.damageTakenMult ?? ef.damageTakenMult ?? 1
+      );
+      if (Number.isFinite(dmgTakenMult) && dmgTakenMult !== 1) {
+        summary.damageTakenMult *= dmgTakenMult;
+        if (dmgTakenMult > 1.01) {
+          summary.debuff += (dmgTakenMult - 1) * 235 * turnFactor;
+          summary.hasArmorBreak = true;
+        } else if (dmgTakenMult > 0 && dmgTakenMult < 0.99) {
+          summary.guard += (1 - dmgTakenMult) * 240 * turnFactor;
+          summary.hasDefenseBuff = true;
+          isPositive = true;
+        }
+      }
+
+      // 4b. Chi Drain on Hit modifiers
+      const chiDrain = Number(
+        ef.chiDrainOnHit ?? mods.chiDrainOnHit ?? 0
+      );
+      if (chiDrain > 0) {
+        summary.chiDrainOnHit += chiDrain;
+        summary.power += chiDrain * 28 * turnFactor;
+        summary.hasChiDrain = true;
+        summary.hasPowerBuff = true;
+        isPositive = true;
       }
 
       // 5. Evasion & Accuracy modifiers
@@ -338,8 +369,8 @@
   }
 
   /*
-- Evaluates a single fighter's board state including LP, Chi, Faint danger curve,
-- and Delayed-Reward Buffs scaled by Chi Readiness & Time Horizon.
+   * Evaluates a single fighter's board state including LP, Chi, Faint danger curve,
+   * and Delayed-Reward Buffs scaled by Chi Readiness & Time Horizon.
    */
   function evaluateFighter(fighter, opponent, ownMoves) {
     if (!fighter) return 0;
@@ -352,6 +383,7 @@
     const oppIsFainted = Boolean(opponent?.isFainted || Number(opponent?.stunned) > 0);
 
     const status = summarizeStatuses(fighter);
+    const enemyStatus = opponent ? summarizeStatuses(opponent) : null;
     const needsDynamo = kitRequiresEnableSpecials(ownMoves);
     const needsAirborne = kitRequiresAirborne(ownMoves);
 
@@ -425,9 +457,12 @@
     score += status.guard * oppTimeFactor;
     score -= status.debuff;
 
-    // Synergy bonus: having an active offensive buff AND enough Chi + Time to fire an S move
+    // Synergy bonus: having an active offensive buff OR armor_break on opponent + Chi + Time
     if (status.hasPowerBuff && chi >= 5 && timeHorizonFactor >= 0.6) {
       score += 42 * timeHorizonFactor;
+    }
+    if (enemyStatus?.hasArmorBreak && chi >= 4 && timeHorizonFactor >= 0.4) {
+      score += 24 * timeHorizonFactor;
     }
 
     if (chi >= 8) score += 20;
@@ -450,7 +485,7 @@
   }
 
   /*
-- 1. RiderBrains.evaluate(state, slot)
+   * 1. RiderBrains.evaluate(state, slot)
    */
   function evaluate(state, slot) {
     if (!state) return 0;
@@ -481,8 +516,8 @@
   }
 
   /*
-- 2. RiderBrains.intent(state, slot, difficulty)
-- Returns tactical strategy name and preferred move keys for rollouts & search.
+   * 2. RiderBrains.intent(state, slot, difficulty)
+   * Returns tactical strategy name and preferred move keys for rollouts & search.
    */
   function intent(state, slot, difficulty = "master") {
     const enemySlot = otherSlot(slot);
@@ -502,6 +537,7 @@
     const enemyFainted = Boolean(enemy.isFainted || Number(enemy.stunned) > 0);
 
     const status = summarizeStatuses(own);
+    const enemyStatus = summarizeStatuses(enemy);
     const needsDynamo = kitRequiresEnableSpecials(moves);
     const needsAirborne = kitRequiresAirborne(moves);
     const preferred = [];
@@ -587,13 +623,13 @@
       };
     }
 
-    // Case 3: We have an active Power Buff -> Cash it out with S or heavy D!
-    if (status.hasPowerBuff && ownChi >= 4) {
+    // Case 3: We have an active Power Buff OR enemy has Armor Break -> Cash it out with S or heavy D!
+    if ((status.hasPowerBuff || enemyStatus.hasArmorBreak) && ownChi >= 4) {
       for (const k of ["S+L", "S+I", "S+K", "S+J", "D+L", "D+I", "D+K"]) {
         if (legalKey(k)) preferred.push(k);
       }
       return {
-        name: "cash_out_buff",
+        name: enemyStatus.hasArmorBreak ? "punish_armor_break" : "cash_out_buff",
         preferred: preferred.slice(0, 4)
       };
     }
@@ -649,7 +685,7 @@
   }
 
   /*
-- Internal core tactical scoring shared by `prior` and `bonus`.
+   * Internal core tactical scoring shared by `prior` and `bonus`.
    */
   function scoreActionTactics(state, slot, action, difficulty = "master") {
     if (!state || !action) return 0;
@@ -748,8 +784,13 @@
       }
     }
 
-    // 1. LETHAL / KILL-CONFIRM CHECK:
-    const effectiveDmg = damage * (status.hasPowerBuff ? 1.30 : 1.0) * (0.65 + 0.35 * (charge / 100));
+    // 1. LETHAL / KILL-CONFIRM CHECK (including enemy armor_break vulnerability):
+    const enemyVulnerability = Math.max(1, Number(enemyStatus.damageTakenMult || 1));
+    const effectiveDmg =
+      damage *
+      (status.hasPowerBuff ? 1.30 : 1.0) *
+      enemyVulnerability *
+      (0.65 + 0.35 * (charge / 100));
     if (effectiveDmg > 0 && enemyLp <= effectiveDmg * 1.05) {
       points += 52 + (charge / 100) * 14;
     } else if (damage > 0 && suddenDeathEnemy) {
@@ -782,16 +823,20 @@
       }
     }
 
-    // 3. DEBUFF APPLICATION VALUE (e.g. Amazon Bleed, Stronger Paralyze Shock, Riderman Rope Bind):
-    if (move.debuff && !enemyFainted) {
-      const debuffId = String(move.debuff.id || "");
+    // 3. DEBUFF APPLICATION VALUE (e.g. Armor Break, Amazon Bleed, Stronger Paralyze Shock, Riderman Rope Bind):
+    const debuffSpec = move.debuff || move.targetDebuff;
+    if (debuffSpec && !enemyFainted) {
+      const debuffId = String(debuffSpec.id || "");
+      const debuffEffects = debuffSpec.effects || debuffSpec;
       const enemyAlreadyHas = (enemy.activeBuffs || []).some(
         b => b.id === debuffId && b.roundsLeft > 1 && !b.refreshable
       );
       if (!enemyAlreadyHas && enemyLp >= 450) {
-        if (move.debuff.effects?.lpBleed) {
+        if (Number(debuffEffects.damageTakenMult) > 1.01) {
+          points += 24;
+        } else if (debuffEffects.lpBleed) {
           points += 22;
-        } else if (move.debuff.effects?.speed && move.debuff.effects.speed < 1) {
+        } else if (debuffEffects.speed && debuffEffects.speed < 1) {
           points += 18;
         }
       }
@@ -809,6 +854,10 @@
     }
 
     // 5. DIRECTION-SPECIFIC TACTICAL DISCIPLINE (W / A / S / D)
+    const grantsChiDrain = Boolean(
+      Number(move.buff?.chiDrainOnHit ?? move.buff?.effects?.chiDrainOnHit ?? 0) > 0
+    );
+
     if (dir === "W" && !enablesSpecials && !(grantsAirborne && needsAirborne) && damage === 0) {
       // CRITICAL RULE: Delayed W buffs need future turns!
       if (lowTimeHorizon && !instantHealW && !(faintRelief >= 25 && ownFaintPct >= 72)) {
@@ -820,10 +869,18 @@
       } else if (status.positiveCount >= 2 && faintRelief === 0) {
         // Don't stack 3 buffs in a row; attack now!
         points -= 38;
-      } else if (status.hasPowerBuff && (key === "W+K" || key === "W+J") && faintRelief === 0) {
+      } else if (grantsChiDrain && status.hasChiDrain && faintRelief === 0) {
+        points -= 36;
+      } else if (status.hasPowerBuff && !grantsChiDrain && (key === "W+K" || key === "W+J") && faintRelief === 0) {
         points -= 36;
       } else if (status.hasDefenseBuff && key === "W+I") {
         points -= 38;
+      } else if (grantsChiDrain && faintRelief === 0) {
+        if (!status.hasChiDrain && enemyChi >= 3 && ownLp >= 550 && enemyLp >= 500) {
+          points += 20;
+        } else {
+          points -= 20;
+        }
       } else if (faintRelief === 0) {
         if (key === "W+K" || key === "W+J") {
           if (ownChi >= cost + 4 && ownLp >= 750 && enemyLp >= 600) {
@@ -860,6 +917,12 @@
       if (status.hasPowerBuff && ownChi < 4) {
         points += 14;
       }
+      if (enemyStatus.hasArmorBreak) {
+        points += 14;
+      }
+      if (status.hasChiDrain && enemyChi >= 2) {
+        points += 12;
+      }
       if (move.requiresAirborne && status.isAirborne) {
         points += 10;
       }
@@ -878,6 +941,12 @@
         // CASH OUT ACTIVE POWER BUFF!
         points += 34 + damage * 0.025;
       }
+      if (enemyStatus.hasArmorBreak) {
+        points += 22 + damage * 0.02;
+      }
+      if (status.hasChiDrain && enemyChi >= 2) {
+        points += 14;
+      }
       if (enemyStatus.hasDefenseBuff && charge < 60) {
         points -= 8;
       }
@@ -890,8 +959,8 @@
   }
 
   /*
-- 3. RiderBrains.prior(state, slot, action, difficulty)
-- Returns a strictly positive weight (>= 0.05) used by ForeseeEngine.policy().
+   * 3. RiderBrains.prior(state, slot, action, difficulty)
+   * Returns a strictly positive weight (>= 0.05) used by ForeseeEngine.policy().
    */
   function prior(state, slot, action, difficulty = "master") {
     const raw = scoreActionTactics(state, slot, action, difficulty);
@@ -901,8 +970,8 @@
   }
 
   /*
-- 4. RiderBrains.bonus(state, slot, action, difficulty)
-- Returns an additive root score adjustment used by ForeseeEngine.search().
+   * 4. RiderBrains.bonus(state, slot, action, difficulty)
+   * Returns an additive root score adjustment used by ForeseeEngine.search().
    */
   function bonus(state, slot, action, difficulty = "master") {
     if (difficulty === "easy") {
