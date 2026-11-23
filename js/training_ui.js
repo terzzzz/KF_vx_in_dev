@@ -1,7 +1,7 @@
 /* js/training_ui.js
  * Kamen Fight
  * Build: v5-state256-action17
- * Matrix: v8-8riders-9backup (Row-Isolated 8-File Drive Sync Edition)
+ * Matrix: v8-18slots-dynamic (Row-Isolated Drive Sync Edition)
  * Patch: charge1-reset1
  */
 (function (g) {
@@ -10,6 +10,7 @@
   const BUILD = "v5-state256-action17";
   const PATCH = "charge1-reset1";
   const CACHE_TAG = BUILD + "-" + PATCH + "-v8";
+  const MATRIX_SLOT_COUNT = 18;
 
   const EXPECTED_SCHEMA =
     "kf-state256-action17-v2-charge1-reset1";
@@ -35,20 +36,20 @@
     host.classList.add("soul-tools");
 
     host.innerHTML = `
-      <h2>KAMEN FIGHT — v8 RIDER MATRIX TRAINER (ROW-ISOLATED 8×8)</h2>
+      <h2>KAMEN FIGHT — v8 RIDER MATRIX TRAINER (ROW-ISOLATED, UP TO 18×18)</h2>
 
       <p>
         Build: <strong>${BUILD}</strong> |
-        Matrix: <strong>Row-Isolated Mode (1 Rider Row = 8 Matchups at a time)</strong> |
+        Matrix: <strong>Row-Isolated Mode (1 Rider Row at a time)</strong> |
         Patch: <strong>${PATCH}</strong><br>
-        256 inputs / 17 actions (42,257 params/matchup | 8 matchups/row | 9 backup slots reserved).
+        256 inputs / 17 actions (42,257 params/matchup | up to 18×18 matrix capacity).
       </p>
 
       <p>
-        Workflow: <strong>1. Pull Row (8 Files) ← Drive</strong> →
+        Workflow: <strong>1. Pull Row ← Drive</strong> →
         <strong>2. Train / Evaluate Row</strong> →
-        <strong>3. Sync Row (8 Files) → Drive</strong> →
-        <strong>4. Cut Connection & Purge Row RAM</strong> before switching to the next Rider row.
+        <strong>3. Sync Row → Drive</strong> →
+        <strong>4. Cut Connection &amp; Purge Row RAM</strong> before switching to the next Rider row.
       </p>
 
       <div class="soul-fields">
@@ -276,12 +277,14 @@
 
     function getActiveRowRiders() {
       if (!data || !Array.isArray(data.riders)) return [];
-      return data.riders.slice(0, 8);
+      return data.riders.slice(0, MATRIX_SLOT_COUNT);
     }
 
     function triggerHeaderGridRender() {
-      if (typeof g.render64MatrixHeaderGrid === "function") {
-        g.render64MatrixHeaderGrid();
+      const renderFn =
+        g.renderMatrixHeaderGrid || g.render64MatrixHeaderGrid;
+      if (typeof renderFn === "function") {
+        renderFn();
       }
     }
 
@@ -297,7 +300,11 @@
 
     function syncRowSummaryToHeader(learnerId) {
       if (!data || !g.SoulAgent || !learnerId) return;
-      const ramPool = (g.__KF_MATRIX64_RAM__ = g.__KF_MATRIX49_RAM__ = g.__KF_MATRIX64_RAM__ || {});
+      const ramPool =
+        (g.__KF_MATRIX_RAM__ =
+          g.__KF_MATRIX64_RAM__ =
+          g.__KF_MATRIX49_RAM__ =
+            g.__KF_MATRIX_RAM__ || g.__KF_MATRIX64_RAM__ || {});
       const lCode = g.SoulAgent.toCode(learnerId);
       const p1Idx = parseInt(lCode, 10) - 1;
       const rowRiders = getActiveRowRiders();
@@ -309,7 +316,7 @@
           g.SoulAgent.getSection(learnerId, oppId, "candidate") ||
           g.SoulAgent.getSection(learnerId, oppId, "active");
 
-        if (p1Idx >= 0 && p1Idx < 8) {
+        if (p1Idx >= 0 && p1Idx < MATRIX_SLOT_COUNT) {
           const mId = `r${p1Idx}_vs_r${j}`;
           if (soulBest) {
             ramPool[mId] = {
@@ -396,6 +403,7 @@
 
       const codes = agent ? agent.getActiveCodes() : [];
       const lastCode = codes[codes.length - 1] || "008";
+      const remainingSlots = Math.max(0, MATRIX_SLOT_COUNT - codes.length);
 
       const lines = [
         validSelection
@@ -425,7 +433,7 @@
       ].filter(Boolean);
 
       if (data && agent && validSelection) {
-        lines.push("", `ACTIVE ROW ${learnerCode} MATRIX (${codes.length} MATCHUPS + 9 BACKUP SLOTS)`);
+        lines.push("", `ACTIVE ROW ${learnerCode} MATRIX (${codes.length} MATCHUPS + ${remainingSlots} EXPANSION SLOTS)`);
         lines.push("     " + codes.map(code => code.padStart(7)).join(" "));
 
         const candRow = codes.map(oppCode => {
@@ -977,11 +985,12 @@
                 syncRowSummaryToHeader(selected.learner);
               }
 
+              const rowCount = getActiveRowRiders().length;
               output(
                 formatReport(report) +
                 (
                   training
-                    ? "\n\nRow candidate matchup(s) saved. Click '2. Sync Row (8 Files) → Drive' in the Top Bar, then '3. Cut Connection & Purge Row RAM'."
+                    ? `\n\nRow candidate matchup(s) saved. Click '2. Sync Row (${rowCount} Files) → Drive' in the Top Bar, then '3. Cut Connection & Purge Row RAM'.`
                     : report.cancelled
                       ? "\n\nIncomplete evaluation was not recorded for activation."
                       : "\n\nEvaluation finished and recorded."
@@ -1202,9 +1211,9 @@
 
       output(
         `Ready (Row r${initialRowIdx}: ${initialRider.name} — ${rowRiders.length} matchups in row).\n` +
-        "Step 1: Click '1. Pull Row (8 Files) ← Drive' to load this row.\n" +
+        `Step 1: Click '1. Pull Row (${rowRiders.length} Files) ← Drive' to load this row.\n` +
         "Step 2: Click 'TRAIN / RESUME ROW' or 'GUIDED WARM-START ROW'.\n" +
-        "Step 3: Click '2. Sync Row (8 Files) → Drive', then '3. Cut Connection & Purge Row RAM' before switching rows."
+        `Step 3: Click '2. Sync Row (${rowRiders.length} Files) → Drive', then '3. Cut Connection & Purge Row RAM' before switching rows.`
       );
     } catch (error) {
       data = null;
