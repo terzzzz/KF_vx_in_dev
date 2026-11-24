@@ -180,20 +180,20 @@
               type="button"
               class="matrix-btn"
               onclick="window.loadActiveRowFromDrive()">
-        1. Pull Row (9 Files) ← Drive
+1. Pull Row (9 Files) ← Drive
       </button>
 
       <button id="sync-row-btn"
               type="button"
               class="matrix-btn"
               onclick="window.syncActiveRowToDrive()">
-        2. Sync Row (9 Files) → Drive
+2. Sync Row (9 Files) → Drive
       </button>
 
       <button type="button"
               class="matrix-btn danger"
               onclick="window.cutConnectionAndPurgeRowRAM()">
-        3. Cut Connection &amp; Purge Row RAM
+3. Cut Connection &amp; Purge Row RAM
       </button>
 
       <button type="button"
@@ -256,6 +256,21 @@
       const MATRIX_SLOT_COUNT = 18;
       const RAM_ROW_CACHE = (g.__KF_MATRIX_RAM__ = g.__KF_MATRIX64_RAM__ = g.__KF_MATRIX49_RAM__ = {});
 
+      // Skip loading static data/matrix/matrix_*.json files into RAM on train.html boot
+      g.__KF_SKIP_STATIC_MATRIX__ = true;
+      if (typeof g.fetch === "function") {
+        const origFetch = g.fetch.bind(g);
+        g.fetch = function (input, init) {
+          const url = typeof input === "string" ? input : (input && input.url) || "";
+          if (url.includes("data/matrix/matrix_")) {
+            return Promise.resolve(
+              new Response("{}", { status: 404, statusText: "Skipped in Row Trainer" })
+            );
+          }
+          return origFetch(input, init);
+        };
+      }
+
       const ACTIVE_RIDERS = [
         { index: 0, id: "ichigo",   code: "r0", soulCode: "001", name: "Kamen Rider Ichigo" },
         { index: 1, id: "nigo",     code: "r1", soulCode: "002", name: "Kamen Rider Nigo" },
@@ -264,7 +279,7 @@
         { index: 4, id: "x",        code: "r4", soulCode: "005", name: "Kamen Rider X" },
         { index: 5, id: "amazon",   code: "r5", soulCode: "006", name: "Kamen Rider Amazon" },
         { index: 6, id: "stronger", code: "r6", soulCode: "007", name: "Kamen Rider Stronger" },
-        { index: 7, id: "skyrider", code: "r7", soulCode: "008", name: "Skyrider" },
+        { index: 7, id: "skyrider", code: "r7", soulCode: "008", name: "Kamen Rider Skyrider" },
         { index: 8, id: "super_1",  code: "r8", soulCode: "009", name: "Kamen Rider Super-1" }
       ];
 
