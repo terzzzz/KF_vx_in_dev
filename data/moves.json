@@ -655,6 +655,7 @@
       "chiDrainOnHit": 1,
       "chiRefundOnHit": 2,
       "baseDamage": 64,
+      "baseFaintDamage": 22,
       "hitChance": 79,
       "video": "elek_hand.mp4"
     },
@@ -665,6 +666,7 @@
       "chiCost": 3,
       "chiDrainOnHit": 2,
       "baseDamage": 270,
+      "baseFaintDamage": 26,
       "hitChance": 78,
       "video": "elek_beam.mp4"
     },
@@ -691,7 +693,6 @@
       "chiCost": 7,
       "chiRefundOnHit": 3,
       "baseDamage": 560,
-      "baseFaintDamage": 38,
       "hitChance": 76,
       "video": "moon_kick.mp4"
     },
@@ -1319,21 +1320,21 @@
         ]
       }
     },
-"super_1": {
+    "super_1": {
       "id": "super_1",
       "en": {
         "name": "Kamen Rider Super-1",
         "basic": [
-          { "name": "Super Hand Jab", "cmd": "D+J", "chi": 0, "dmg": 42, "remarks": "Gain 2 CHI if hit" },
+          { "name": "Hand Jab", "cmd": "D+J", "chi": 0, "dmg": 42, "remarks": "Gain 2 CHI if hit" },
           { "name": "Shorinji Kick", "cmd": "D+K", "chi": 0, "dmg": 45, "remarks": "Gain 2 CHI if hit" },
-          { "name": "Power Hand Crush", "cmd": "D+L", "chi": 2, "dmg": 72, "remarks": "Reduce target defense for 3 rounds" },
-          { "name": "Elek Hand Shock", "cmd": "D+I", "chi": 2, "dmg": 64, "remarks": "Gain 2 CHI and drain 1 CHI if hit" }
+          { "name": "Power Hand Crush", "cmd": "D+L", "chi": 1, "dmg": 72, "remarks": "Gain 3 CHI if hit, reduce target defense for 3 rounds" },
+          { "name": "Elek Hand Shock", "cmd": "D+I", "chi": 1, "dmg": 64, "remarks": "Gain 3 CHI if hit, drain 1 CHI, build faint" }
         ],
         "special": [
-          { "name": "Elek Beam", "cmd": "S+J", "chi": 3, "dmg": 270, "remarks": "Long reach, drain 2 CHI" },
+          { "name": "Elek Beam", "cmd": "S+J", "chi": 3, "dmg": 270, "remarks": "Long reach, drain 2 CHI, build faint" },
           { "name": "Power Hand Smash", "cmd": "S+K", "chi": 5, "dmg": 360, "remarks": "Reduce target defense for 3 rounds" },
-          { "name": "Super Rider Moon Surface Kick", "cmd": "S+L", "chi": 7, "dmg": 560, "remarks": "Build faint" },
-          { "name": "Super Rider Lightning Sword", "cmd": "S+I", "chi": 9, "dmg": 880, "remarks": "" }
+          { "name": "Super Rider Moon Surface Kick", "cmd": "S+L", "chi": 7, "dmg": 560, "remarks": "" },
+          { "name": "Super Rider Lightning Sword", "cmd": "S+I", "chi": 9, "dmg": 720, "remarks": "" }
         ],
         "utilities": [
           { "name": "Super Jump", "cmd": "W+I", "chi": 0, "effect": "Buff charge speed and evasion", "remarks": "Last 3 rounds" },
@@ -1349,19 +1350,19 @@
       "ja": {
         "name": "仮面ライダースーパー1",
         "basic": [
-          { "name": "スーパーハンドジャブ", "cmd": "D+J", "chi": 0, "dmg": 42, "remarks": "ヒット時、氣+2" },
+          { "name": "ハンドジャブ", "cmd": "D+J", "chi": 0, "dmg": 42, "remarks": "ヒット時、氣+2" },
           { "name": "少林寺キック", "cmd": "D+K", "chi": 0, "dmg": 45, "remarks": "ヒット時、氣+2" },
-          { "name": "パワーハンドクラッシュ", "cmd": "D+L", "chi": 2, "dmg": 72, "remarks": "3ラウンドの間、相手の防御力を低下" },
-          { "name": "エレキハンドショック", "cmd": "D+I", "chi": 2, "dmg": 64, "remarks": "ヒット時、氣+2・氣を1吸収" }
+          { "name": "パワーハンドクラッシュ", "cmd": "D+L", "chi": 1, "dmg": 72, "remarks": "ヒット時、氣+3・3ラウンドの間、相手の防御力を低下" },
+          { "name": "エレキハンドショック", "cmd": "D+I", "chi": 1, "dmg": 64, "remarks": "ヒット時、氣+3・氣を1吸収・気絶値蓄積" }
         ],
         "special": [
-          { "name": "エレキ光線", "cmd": "S+J", "chi": 3, "dmg": 270, "remarks": "遠距離リーチ・氣を2吸収" },
+          { "name": "エレキ光線", "cmd": "S+J", "chi": 3, "dmg": 270, "remarks": "遠距離リーチ・氣を2吸収・気絶値蓄積" },
           { "name": "パワーハンドスマッシュ", "cmd": "S+K", "chi": 5, "dmg": 360, "remarks": "3ラウンドの間、相手の防御力を低下" },
-          { "name": "スーパーライダー月面キック", "cmd": "S+L", "chi": 7, "dmg": 560, "remarks": "気絶値蓄積" },
-          { "name": "スーパーライダー稲妻閃光剣", "cmd": "S+I", "chi": 9, "dmg": 880, "remarks": "" }
+          { "name": "スーパーライダー月面キック", "cmd": "S+L", "chi": 7, "dmg": 560, "remarks": "" },
+          { "name": "スーパーライダー稲妻閃光剣", "cmd": "S+I", "chi": 9, "dmg": 720, "remarks": "" }
         ],
         "utilities": [
-          { "name": "スーパージャンプ", "cmd": "W+I", "chi": 0, "effect": "チャージ速度・回避率アップ", "remarks": "3ラウンド持続" },
+          { "name": "ジャンプ", "cmd": "W+I", "chi": 0, "effect": "チャージ速度・回避率アップ", "remarks": "3ラウンド持続" },
           { "name": "レーダーハンド・ロックオン", "cmd": "W+J", "chi": 1, "effect": "命中率アップ", "remarks": "3ラウンド持続" },
           { "name": "冷熱ハンド・冷凍ガス", "cmd": "W+K", "chi": 2, "effect": "3ラウンドの間、相手のチャージ速度を低下", "remarks": "遠距離リーチ・ダメージを与える" },
           { "name": "赤心瞑想", "cmd": "W+L", "chi": 0, "effect": "気絶値を減少", "remarks": "" }
@@ -1374,16 +1375,16 @@
       "zh": {
         "name": "假面騎士Super-1",
         "basic": [
-          { "name": "超級手刺拳", "cmd": "D+J", "chi": 0, "dmg": 42, "remarks": "命中時氣+2" },
+          { "name": "手刺拳", "cmd": "D+J", "chi": 0, "dmg": 42, "remarks": "命中時氣+2" },
           { "name": "少林寺踢", "cmd": "D+K", "chi": 0, "dmg": 45, "remarks": "命中時氣+2" },
-          { "name": "強力手粉碎", "cmd": "D+L", "chi": 2, "dmg": 72, "remarks": "降低對手防禦力3回合" },
-          { "name": "電氣手電擊", "cmd": "D+I", "chi": 2, "dmg": 64, "remarks": "命中時氣+2、吸取1點氣" }
+          { "name": "強力手粉碎", "cmd": "D+L", "chi": 1, "dmg": 72, "remarks": "命中時氣+3、降低對手防禦力3回合" },
+          { "name": "電氣手電擊", "cmd": "D+I", "chi": 1, "dmg": 64, "remarks": "命中時氣+3、吸取1點氣、累積暈眩值" }
         ],
         "special": [
-          { "name": "電氣光線", "cmd": "S+J", "chi": 3, "dmg": 270, "remarks": "遠距離攻擊、吸取2點氣" },
+          { "name": "電氣光線", "cmd": "S+J", "chi": 3, "dmg": 270, "remarks": "遠距離攻擊、吸取2點氣、累積暈眩值" },
           { "name": "強力手重擊", "cmd": "S+K", "chi": 5, "dmg": 360, "remarks": "降低對手防禦力3回合" },
-          { "name": "超級騎士月面踢", "cmd": "S+L", "chi": 7, "dmg": 560, "remarks": "累積暈眩值" },
-          { "name": "超級騎士閃電劍", "cmd": "S+I", "chi": 9, "dmg": 880, "remarks": "" }
+          { "name": "超級騎士月面踢", "cmd": "S+L", "chi": 7, "dmg": 560, "remarks": "" },
+          { "name": "超級騎士閃電劍", "cmd": "S+I", "chi": 9, "dmg": 720, "remarks": "" }
         ],
         "utilities": [
           { "name": "超級跳躍", "cmd": "W+I", "chi": 0, "effect": "提升蓄力速度與迴避率", "remarks": "持續3回合" },
