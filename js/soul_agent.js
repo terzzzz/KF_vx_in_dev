@@ -81,6 +81,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
     stronger: "007",
     skyrider: "008",
     super1: "009",
+    super_1: "009",
     zx: "010",
     black: "011",
     shadowmoon: "012",
@@ -111,6 +112,10 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   let pendingIdbWrite = Promise.resolve();
 
   const warnings = [];
+
+  function skipStaticMatrix() {
+    return Boolean(g.__KF_SKIP_STATIC_MATRIX__);
+  }
 
   function formatCodeNumber(num) {
     return String(num).padStart(3, "0");
@@ -205,10 +210,6 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
     return REVERSE_CODES[normalized] || normalized;
   }
 
-  /**
-   * Converts any rider identifier ("ichigo", "001", "r0", 0) to 0..17 index
-   * where r0 = Ichigo (0) .. r7 = Skyrider (7) .. r17 = Slot 18 (17).
-   */
   function toRiderIndex(id) {
     if (
       typeof id === "number" &&
@@ -780,7 +781,6 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
   function saveToLocalStorage() {
     const payload = serializeStorePayload();
 
-    // Always write full payload to IndexedDB (unlimited browser storage)
     writeToIndexedDB(clone(payload));
 
     try {
@@ -794,7 +794,6 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       storage.setItem(STORAGE_KEY, JSON.stringify(payload));
       storageWarning = "";
     } catch (_) {
-      // IndexedDB + RAM hold all matrices even when 5MB localStorage is full
       storageWarning = "";
     }
   }
@@ -854,13 +853,6 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
     return url;
   }
 
-  /**
-   * Builds candidate URLs for a 1v1 matchup:
-   * 1. `data/matrix/matrix_r{A}_vs_r{B}.json` (Primary location in `data/matrix/`)
-   * 2. `data/matrix/matrix_r{A}_r{B}.json`
-   * 3. `data/matrix_r{A}_vs_r{B}.json`
-   * 4. `data/matrix_r{A}_r{B}.json`
-   */
   function matchupMatrixURLs(learner, opponent) {
     const rA = toRiderIndex(learner);
     const rB = toRiderIndex(opponent);
@@ -868,9 +860,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
 
     const relPaths = [
       `data/matrix/matrix_r${rA}_vs_r${rB}.json`,
-      `data/matrix/matrix_r${rA}_r${rB}.json`,
-      `data/matrix_r${rA}_vs_r${rB}.json`,
-      `data/matrix_r${rA}_r${rB}.json`
+      `data/matrix/matrix_r${rA}_r${rB}.json`
     ];
 
     return relPaths.map(rel => {
@@ -1116,39 +1106,35 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
 
   const attemptedRepoKeys = new Set();
 
-  /**
-   * Fetches the exact 1v1 matchup file from `data/matrix/matrix_r{learner}_vs_r{opponent}.json`
-   * (with fallbacks to `data/matrix_r{learner}_vs_r{opponent}.json`)
-   * and returns the validated checkpoint object for `ai_worker.js` and `KF_AI.choose()`.
-   */
   async function fetchMatchupFromCDN(learner, opponent) {
     assertRuntime();
 
     const key = getCanonicalKey(learner, opponent);
     attemptedRepoKeys.add(key);
 
-    const candidates = matchupMatrixURLs(learner, opponent);
+    if (!skipStaticMatrix()) {
+      const candidates = matchupMatrixURLs(learner, opponent);
 
-    for (const { url, label } of candidates) {
-      try {
-        const response = await fetch(url, { cache: "no-store" });
-        if (response.status === 404) break;
-        if (!response.ok) continue;
+      for (const { url, label } of candidates) {
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          if (response.status === 404) break;
+          if (!response.ok) continue;
 
-        const payload = await response.json();
-        const ingested = ingestDriveMatchup(payload, learner, opponent);
+          const payload = await response.json();
+          const ingested = ingestDriveMatchup(payload, learner, opponent);
 
-        if (ingested.checkpoint) {
-          const cpCopy = clone(ingested.checkpoint);
-          cpCopy.matrixFile = label;
-          return cpCopy;
+          if (ingested.checkpoint) {
+            const cpCopy = clone(ingested.checkpoint);
+            cpCopy.matrixFile = label;
+            return cpCopy;
+          }
+        } catch (_) {
+          // Try next candidate path
         }
-      } catch (_) {
-        // Try next candidate path
       }
     }
 
-    // Fallback: check if already in active/candidate store
     const existing =
       getSection(learner, opponent, "active") ||
       getSection(learner, opponent, "candidate");
@@ -1171,30 +1157,31 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
     const code = toCode(learner);
     let loadedCount = 0;
 
-    for (const oppCode of getActiveCodes()) {
-      try {
-        const cp = await fetchMatchupFromCDN(code, oppCode);
-        if (cp) loadedCount++;
-      } catch (_) {}
-    }
+    if (!skipStaticMatrix()) {
+      for (const oppCode of getActiveCodes()) {
+        try {
+          const cp = await fetchMatchupFromCDN(code, oppCode);
+          if (cp) loadedCount++;
+        } catch (_) {}
+      }
 
-    if (loadedCount === 0) {
-      try {
-        const response = await fetch(riderBundleURL(code), {
-          cache: "no-store"
-        });
-        if (response.ok) {
-          const payload = await response.json();
-          if (isRiderBundle(payload)) {
-            const result = ingestRiderBundleIntoStore(payload, true);
-            saveToLocalStorage();
-            return result;
+      if (loadedCount === 0) {
+        try {
+          const response = await fetch(riderBundleURL(code), {
+            cache: "no-store"
+          });
+          if (response.ok) {
+            const payload = await response.json();
+            if (isRiderBundle(payload)) {
+              const result = ingestRiderBundleIntoStore(payload, true);
+              saveToLocalStorage();
+              return result;
+            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
     }
 
-    saveToLocalStorage();
     return {
       learnerCode: code,
       loadedCount
@@ -1203,6 +1190,9 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
 
   async function scanAllMatchupsFromRepo() {
     assertRuntime();
+    if (skipStaticMatrix()) {
+      return 0;
+    }
 
     let found = 0;
     const activeCodes = getActiveCodes();
@@ -1214,7 +1204,6 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       }
     }
 
-    // Batch requests (8 at a time) so GitHub Pages is not flooded on startup
     const CONCURRENCY = 8;
     let cursor = 0;
 
@@ -1286,12 +1275,12 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
           throw new Error("Combat dataset is empty or missing riders.");
         }
 
-        // 1. Load local checkpoints from LocalStorage + IndexedDB immediately
         loadFromLocalStorage();
         await loadFromIndexedDB();
 
-        // 2. Scan `data/matrix/matrix_rA_vs_rB.json` in background without blocking UI init
-        scanAllMatchupsFromRepo().catch(() => {});
+        if (!skipStaticMatrix()) {
+          scanAllMatchupsFromRepo().catch(() => {});
+        }
 
         return { data: cachedData };
       })().catch(error => {
@@ -1326,7 +1315,7 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
       (target === "active" ? store.candidate.matchups[key] : null) ||
       null;
 
-    if (!match && !attemptedRepoKeys.has(key)) {
+    if (!match && !skipStaticMatrix() && !attemptedRepoKeys.has(key)) {
       attemptedRepoKeys.add(key);
       fetchMatchupFromCDN(learner, opponent).catch(() => {});
     }
@@ -1830,7 +1819,6 @@ if (typeof window !== "undefined" && !Storage.prototype.__kfRam) {
     status
   };
 
-  // Auto-preload on main thread without blocking UI initialization
   if (typeof document !== "undefined") {
     loadFromLocalStorage();
     setTimeout(() => {
