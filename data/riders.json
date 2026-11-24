@@ -92,7 +92,7 @@
     "id": "super_1",
     "name": "Kamen Rider Super-1",
     "sourceFacing": "right",
-    "maxLp": 3100,
+    "maxLp": 2888,
     "archetype": "Five Hands Tactical / Martial Artist",
     "icon": "assets/images/icons/super_1.png",
     "videoFolder": "assets/videos/super_1/",
