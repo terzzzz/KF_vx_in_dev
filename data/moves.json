@@ -635,7 +635,7 @@
     "D+L": {
       "name": "Power Hand Crush",
       "type": "PHYSICAL",
-      "chiCost": 1,
+      "chiCost": 2,
       "baseDamage": 72,
       "hitChance": 78,
       "video": "power_hand.mp4",
@@ -645,14 +645,15 @@
         "type": "defense",
         "duration": 3,
         "refreshable": true,
-        "effects": { "damageTakenMult": 1.20 }
+        "effects": { "damageTakenMult": 1.30 }
       }
     },
     "D+I": {
       "name": "Elek Hand Shock",
       "type": "PHYSICAL",
-      "chiCost": 1,
+      "chiCost": 2,
       "chiDrainOnHit": 1,
+      "chiRefundOnHit": 2,
       "baseDamage": 64,
       "baseFaintDamage": 22,
       "hitChance": 79,
@@ -700,7 +701,7 @@
       "type": "SPECIAL",
       "chiCost": 9,
       "chiRefundOnHit": 4,
-      "baseDamage": 720,
+      "baseDamage": 880,
       "hitChance": 77,
       "video": "lightning_sword.mp4"
     },
