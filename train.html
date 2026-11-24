@@ -9,6 +9,23 @@
 
   <title>Kamen Fight — RIDER Training (Row-by-Row Matrix, up to 18×18)</title>
 
+  <script>
+    // Skip loading static data/matrix/matrix_*.json files into RAM on train.html boot
+    window.__KF_SKIP_STATIC_MATRIX__ = true;
+    if (typeof window.fetch === "function") {
+      const origFetch = window.fetch.bind(window);
+      window.fetch = function (input, init) {
+        const url = typeof input === "string" ? input : (input && input.url) || "";
+        if (url.includes("data/matrix/matrix_")) {
+          return Promise.resolve(
+            new Response("{}", { status: 404, statusText: "Skipped in Row Trainer" })
+          );
+        }
+        return origFetch(input, init);
+      };
+    }
+  </script>
+
   <style>
     body {
       margin: 0;
@@ -256,21 +273,6 @@
       const MATRIX_SLOT_COUNT = 18;
       const RAM_ROW_CACHE = (g.__KF_MATRIX_RAM__ = g.__KF_MATRIX64_RAM__ = g.__KF_MATRIX49_RAM__ = {});
 
-      // Skip loading static data/matrix/matrix_*.json files into RAM on train.html boot
-      g.__KF_SKIP_STATIC_MATRIX__ = true;
-      if (typeof g.fetch === "function") {
-        const origFetch = g.fetch.bind(g);
-        g.fetch = function (input, init) {
-          const url = typeof input === "string" ? input : (input && input.url) || "";
-          if (url.includes("data/matrix/matrix_")) {
-            return Promise.resolve(
-              new Response("{}", { status: 404, statusText: "Skipped in Row Trainer" })
-            );
-          }
-          return origFetch(input, init);
-        };
-      }
-
       const ACTIVE_RIDERS = [
         { index: 0, id: "ichigo",   code: "r0", soulCode: "001", name: "Kamen Rider Ichigo" },
         { index: 1, id: "nigo",     code: "r1", soulCode: "002", name: "Kamen Rider Nigo" },
@@ -285,6 +287,7 @@
 
       let activeRowIndex = 0;
       let activeAbortController = null;
+      let renderScheduled = false;
 
       function formatSoulCode(idx) {
         return String(idx + 1).padStart(3, "0");
@@ -348,7 +351,7 @@
         });
 
         renderRowSelectOptions();
-        renderActiveRowGrid();
+        scheduleRenderActiveRowGrid();
       }
 
       const GOOGLE_APPS_SCRIPT_TEMPLATE = [
@@ -624,7 +627,6 @@
         }
         const bestSoul = soulCandidate || soulActive || null;
 
-        // Skip sending untrained null cells so Drive never receives empty overwrites
         if (!bestSoul) {
           return { ok: true, skipped: true, fileName: entry.file };
         }
@@ -688,6 +690,7 @@
       }
 
       function renderActiveRowGrid() {
+        renderScheduled = false;
         const gridEl = document.getElementById("matrix-active-row-grid");
         if (!gridEl) return;
 
@@ -729,6 +732,12 @@
         }
       }
 
+      function scheduleRenderActiveRowGrid() {
+        if (renderScheduled) return;
+        renderScheduled = true;
+        requestAnimationFrame(renderActiveRowGrid);
+      }
+
       function setConnBadge(text, disconnected = false) {
         const badge = document.getElementById("matrix-conn-badge");
         if (!badge) return;
@@ -738,9 +747,9 @@
 
       g.getActiveMatrixRowIndex = () => activeRowIndex;
       g.getActiveRowEntries = () => getRowManifest(activeRowIndex);
-      g.renderMatrixHeaderGrid = renderActiveRowGrid;
-      g.render64MatrixHeaderGrid = renderActiveRowGrid;
-      g.render49MatrixHeaderGrid = renderActiveRowGrid;
+      g.renderMatrixHeaderGrid = scheduleRenderActiveRowGrid;
+      g.render64MatrixHeaderGrid = scheduleRenderActiveRowGrid;
+      g.render49MatrixHeaderGrid = scheduleRenderActiveRowGrid;
 
       g.setTrainingExecutionMode = function (mode) {
         const target = mode === "eval" ? "eval" : "train";
@@ -768,7 +777,7 @@
 
         purgeRamCache();
         setConnBadge(`LINK: CUT / PURGED (Row r${activeRowIndex})`, true);
-        renderActiveRowGrid();
+        scheduleRenderActiveRowGrid();
 
         if (!silent) {
           const status = document.getElementById("matrix-sync-status");
@@ -797,7 +806,7 @@
         }
 
         setConnBadge(`LINK: READY (Row r${activeRowIndex})`, false);
-        renderActiveRowGrid();
+        scheduleRenderActiveRowGrid();
 
         const status = document.getElementById("matrix-sync-status");
         if (status && riderObj) {
@@ -842,7 +851,7 @@
           }
 
           await g.SoulAgent?.flushStorage?.();
-          renderActiveRowGrid();
+          scheduleRenderActiveRowGrid();
           g.SoulTrainer?.refreshUI?.();
 
           setConnBadge(`LINK: CONNECTED (Row r${activeRowIndex})`, false);
@@ -905,7 +914,7 @@
             results.push({ key: entry.key, ok: true, skipped: Boolean(res?.skipped) });
           }
 
-          renderActiveRowGrid();
+          scheduleRenderActiveRowGrid();
           g.SoulTrainer?.refreshUI?.();
 
           setConnBadge(`LINK: SYNCED (Row r${activeRowIndex})`, false);
@@ -971,6 +980,8 @@
   <script src="js/soul_sim.js?v=v5-state256-action17-charge1-reset1-v8"></script>
   <script src="js/soul_agent.js?v=v5-state256-action17-charge1-reset1-v8"></script>
   <script src="js/ai.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/soul_pipeline_tests.js?v=v5-state256-action17-charge1-reset1-v8"></script>
+  <script src="js/training_ui.js?v=v5-state256-action17-charge1-reset1-v8"></script>
 
   <script>
     (function (g) {
@@ -984,15 +995,11 @@
             if (res?.data?.riders) {
               g.MatrixStorage.syncManifestWithDataset(res.data.riders);
             }
-            g.renderMatrixHeaderGrid?.();
           })
           .catch(() => {});
       }
       g.renderMatrixHeaderGrid?.();
     })(globalThis);
   </script>
-
-  <script src="js/soul_pipeline_tests.js?v=v5-state256-action17-charge1-reset1-v8"></script>
-  <script src="js/training_ui.js?v=v5-state256-action17-charge1-reset1-v8"></script>
 </body>
 </html>
