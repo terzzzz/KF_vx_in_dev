@@ -163,7 +163,7 @@
         MODE: TRAIN (Live Search OFF)
       </span>
       <span id="matrix-row-count-badge" class="matrix-badge">
-        ROW r0: 0 / 8 LOADED
+        ROW r0: 0 / 9 LOADED
       </span>
     </div>
 
@@ -180,20 +180,20 @@
               type="button"
               class="matrix-btn"
               onclick="window.loadActiveRowFromDrive()">
-1. Pull Row (8 Files) ← Drive
+        1. Pull Row (9 Files) ← Drive
       </button>
 
       <button id="sync-row-btn"
               type="button"
               class="matrix-btn"
               onclick="window.syncActiveRowToDrive()">
-2. Sync Row (8 Files) → Drive
+        2. Sync Row (9 Files) → Drive
       </button>
 
       <button type="button"
               class="matrix-btn danger"
               onclick="window.cutConnectionAndPurgeRowRAM()">
-3. Cut Connection &amp; Purge Row RAM
+        3. Cut Connection &amp; Purge Row RAM
       </button>
 
       <button type="button"
@@ -264,7 +264,8 @@
         { index: 4, id: "x",        code: "r4", soulCode: "005", name: "Kamen Rider X" },
         { index: 5, id: "amazon",   code: "r5", soulCode: "006", name: "Kamen Rider Amazon" },
         { index: 6, id: "stronger", code: "r6", soulCode: "007", name: "Kamen Rider Stronger" },
-        { index: 7, id: "skyrider", code: "r7", soulCode: "008", name: "Skyrider" }
+        { index: 7, id: "skyrider", code: "r7", soulCode: "008", name: "Skyrider" },
+        { index: 8, id: "super_1",  code: "r8", soulCode: "009", name: "Kamen Rider Super-1" }
       ];
 
       let activeRowIndex = 0;
@@ -340,6 +341,12 @@
         "const FOLDER_ID = '15P5HeKqLxMYw3ykirJj2HMT726SZnkId';",
         "const MATRIX_SLOT_COUNT = 18; // r0..r17 (001..018)",
         "",
+        "function jsonResponse(obj) {",
+        "  return ContentService",
+        "    .createTextOutput(JSON.stringify(obj))",
+        "    .setMimeType(ContentService.MimeType.JSON);",
+        "}",
+        "",
         "function isValidMatrixFilename(fileName) {",
         "  if (typeof fileName !== 'string') return false;",
         "  const cellMatch = /^matrix_r(\\d+)_vs_r(\\d+)\\.json$/.exec(fileName);",
@@ -357,20 +364,51 @@
         "}",
         "",
         "function doGet(e) {",
-        "  const params = (e && e.parameter) || {};",
-        "  const file = params.file || ('matrix_' + params.key + '.json');",
-        "  const data = loadMatrixFromDriveFolder(FOLDER_ID, file);",
-        "  return ContentService.createTextOutput(data || '{}').setMimeType(ContentService.MimeType.JSON);",
+        "  try {",
+        "    const params = (e && e.parameter) || {};",
+        "    if (params.action === 'ping') {",
+        "      return jsonResponse({ ok: true, service: 'KamenFightMatrixDrive', capacity: MATRIX_SLOT_COUNT });",
+        "    }",
+        "    if (params.action === 'list') {",
+        "      const folder = DriveApp.getFolderById(FOLDER_ID);",
+        "      const iter = folder.getFiles();",
+        "      const files = [];",
+        "      while (iter.hasNext()) {",
+        "        const f = iter.next();",
+        "        if (!f.isTrashed() && isValidMatrixFilename(f.getName())) {",
+        "          files.push(f.getName());",
+        "        }",
+        "      }",
+        "      return jsonResponse({ ok: true, count: files.length, files: files.sort() });",
+        "    }",
+        "    const file = params.file || ('matrix_' + params.key + '.json');",
+        "    const data = loadMatrixFromDriveFolder(FOLDER_ID, file);",
+        "    return ContentService.createTextOutput(data || '{}').setMimeType(ContentService.MimeType.JSON);",
+        "  } catch (err) {",
+        "    return jsonResponse({ ok: false, error: String(err && err.message ? err.message : err) });",
+        "  }",
         "}",
         "",
         "function doPost(e) {",
         "  const lock = LockService.getScriptLock();",
-        "  lock.waitLock(30000);",
+        "  if (!lock.tryLock(30000)) {",
+        "    return jsonResponse({ ok: false, error: 'Script lock busy (30s timeout). Try again.' });",
+        "  }",
         "  try {",
-        "    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');",
+        "    const raw = (e && e.postData && e.postData.contents) || '{}';",
+        "    const body = JSON.parse(raw);",
+        "    const folder = DriveApp.getFolderById(FOLDER_ID);",
+        "    if (body.action === 'saveBatch' && Array.isArray(body.items)) {",
+        "      const saved = body.items.map(item =>",
+        "        saveMatrixToDriveFolder(folder, item && item.fileName, item && item.payload)",
+        "      );",
+        "      return jsonResponse({ ok: true, count: saved.filter(r => r.ok && !r.skipped).length, results: saved });",
+        "    }",
         "    const file = body.fileName || ('matrix_' + body.key + '.json');",
-        "    const res = saveMatrixToDriveFolder(FOLDER_ID, file, body.payload);",
-        "    return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);",
+        "    const res = saveMatrixToDriveFolder(folder, file, body.payload);",
+        "    return jsonResponse(res);",
+        "  } catch (err) {",
+        "    return jsonResponse({ ok: false, error: String(err && err.message ? err.message : err) });",
         "  } finally {",
         "    lock.releaseLock();",
         "  }",
@@ -378,31 +416,54 @@
         "",
         "function isValidMatrixPayload(payload) {",
         "  if (!payload || typeof payload !== 'object') return false;",
+        "  if (payload.matchups && typeof payload.matchups === 'object') {",
+        "    return Object.values(payload.matchups).some(cp => {",
+        "      const net = cp && (cp.net || cp);",
+        "      return net && Array.isArray(net.sizes) && Array.isArray(net.layers) && net.layers.length > 0;",
+        "    });",
+        "  }",
         "  const net = payload.net || payload;",
         "  return Array.isArray(net.sizes) && Array.isArray(net.layers) && net.layers.length > 0;",
+        "}",
+        "",
+        "function findLatestMatchingFiles(folder, fileName) {",
+        "  const iter = folder.getFilesByName(fileName);",
+        "  const matches = [];",
+        "  while (iter.hasNext()) {",
+        "    const f = iter.next();",
+        "    if (!f.isTrashed()) matches.push(f);",
+        "  }",
+        "  matches.sort((a, b) => b.getLastUpdated().getTime() - a.getLastUpdated().getTime());",
+        "  return matches;",
         "}",
         "",
         "function loadMatrixFromDriveFolder(folderId, fileName) {",
         "  if (!isValidMatrixFilename(fileName)) return null;",
         "  const folder = DriveApp.getFolderById(folderId || FOLDER_ID);",
-        "  const files = folder.getFilesByName(fileName);",
-        "  if (!files.hasNext()) return null;",
-        "  return files.next().getBlob().getDataAsString();",
+        "  const matches = findLatestMatchingFiles(folder, fileName);",
+        "  if (matches.length === 0) return null;",
+        "  return matches[0].getBlob().getDataAsString();",
         "}",
         "",
-        "function saveMatrixToDriveFolder(folderId, fileName, payloadOrJson) {",
-        "  if (!isValidMatrixFilename(fileName)) throw new Error('Invalid matrix filename (allowed r0..r17): ' + fileName);",
-        "  const parsed = typeof payloadOrJson === 'string' ? JSON.parse(payloadOrJson) : payloadOrJson;",
+        "function saveMatrixToDriveFolder(folderOrId, fileName, payloadOrJson) {",
+        "  if (!isValidMatrixFilename(fileName)) {",
+        "    return { ok: false, skipped: true, fileName: String(fileName || ''), reason: 'Invalid matrix filename (allowed r0..r17): ' + fileName };",
+        "  }",
+        "  let parsed = payloadOrJson;",
+        "  if (typeof payloadOrJson === 'string') {",
+        "    try { parsed = JSON.parse(payloadOrJson); } catch (_) { parsed = null; }",
+        "  }",
         "  if (!isValidMatrixPayload(parsed)) {",
         "    return { ok: true, skipped: true, fileName: fileName, reason: 'Empty or non-network payload' };",
         "  }",
         "  const jsonString = typeof payloadOrJson === 'string' ? payloadOrJson : JSON.stringify(parsed);",
-        "  const folder = DriveApp.getFolderById(folderId || FOLDER_ID);",
-        "  const files = folder.getFilesByName(fileName);",
-        "  if (files.hasNext()) {",
-        "    const file = files.next();",
-        "    file.setContent(jsonString);",
-        "    return { ok: true, fileName: fileName, fileId: file.getId() };",
+        "  const folder = typeof folderOrId === 'string' || !folderOrId ? DriveApp.getFolderById(folderOrId || FOLDER_ID) : folderOrId;",
+        "  const matches = findLatestMatchingFiles(folder, fileName);",
+        "  if (matches.length > 0) {",
+        "    const primary = matches[0];",
+        "    primary.setContent(jsonString);",
+        "    for (let i = 1; i < matches.length; i++) matches[i].setTrashed(true);",
+        "    return { ok: true, fileName: fileName, fileId: primary.getId() };",
         "  }",
         "  const created = folder.createFile(fileName, jsonString, MimeType.PLAIN_TEXT);",
         "  return { ok: true, fileName: fileName, fileId: created.getId() };",
@@ -470,6 +531,30 @@
         }
       }
 
+      function compactNetworkWeights(net) {
+        if (!net || typeof net !== "object" || !Array.isArray(net.layers)) return net;
+        return {
+          ...net,
+          layers: net.layers.map(layer => ({
+            ...layer,
+            W: Array.isArray(layer.W)
+              ? layer.W.map(row => Array.isArray(row) ? row.map(v => Math.round(v * 1e7) / 1e7) : row)
+              : layer.W,
+            b: Array.isArray(layer.b)
+              ? layer.b.map(v => Math.round(v * 1e7) / 1e7)
+              : layer.b
+          }))
+        };
+      }
+
+      function compactSoulSection(sec) {
+        if (!sec || typeof sec !== "object") return null;
+        return {
+          ...sec,
+          net: compactNetworkWeights(sec.net)
+        };
+      }
+
       async function loadMatchupMatrix(riderA, riderB, signal) {
         const entry = getEntry(riderA, riderB);
         const gasUrl = getGasWebAppUrl();
@@ -529,43 +614,62 @@
           return { ok: true, skipped: true, fileName: entry.file };
         }
 
-        let payloadString = JSON.stringify({
-          matchupKey: entry.key,
-          canonicalKey: entry.soulKey,
-          fileName: entry.file,
-          folderId: GDRIVE_FOLDER_ID,
-          p1Rider: entry.p1Id,
-          p2Rider: entry.p2Id,
-          learnerId: entry.p1Id,
-          opponentId: entry.p2Id,
-          games: bestSoul.games || 0,
-          steps: bestSoul.steps || 0,
-          net: bestSoul.net,
-          soulCandidate,
-          soulActive,
-          updatedAt: new Date().toISOString()
-        });
+        const compactCand = compactSoulSection(soulCandidate);
+        const isDuplicateActive =
+          soulCandidate &&
+          soulActive &&
+          soulCandidate.games === soulActive.games &&
+          soulCandidate.steps === soulActive.steps;
+        const compactAct = isDuplicateActive ? null : compactSoulSection(soulActive);
+        const primaryNet = (compactCand || compactAct).net;
 
         const bodyString = JSON.stringify({
           action: "save",
           folderId: GDRIVE_FOLDER_ID,
           key: entry.key,
           fileName: entry.file,
-          payload: JSON.parse(payloadString)
+          payload: {
+            matchupKey: entry.key,
+            canonicalKey: entry.soulKey,
+            fileName: entry.file,
+            folderId: GDRIVE_FOLDER_ID,
+            p1Rider: entry.p1Id,
+            p2Rider: entry.p2Id,
+            learnerId: entry.p1Id,
+            opponentId: entry.p2Id,
+            games: bestSoul.games || 0,
+            steps: bestSoul.steps || 0,
+            net: primaryNet,
+            soulCandidate: compactCand,
+            soulActive: compactAct,
+            updatedAt: new Date().toISOString()
+          }
         });
-        payloadString = null;
 
-        const res = await fetch(gasUrl, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: bodyString,
-          signal
-        });
-
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status} saving ${entry.file}`);
+        let lastErr = null;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const res = await fetch(gasUrl, {
+              method: "POST",
+              headers: { "Content-Type": "text/plain;charset=utf-8" },
+              body: bodyString,
+              signal
+            });
+            if (!res.ok) {
+              throw new Error(`HTTP ${res.status} saving ${entry.file}`);
+            }
+            const data = await res.json();
+            if (data && data.ok === false) {
+              throw new Error(data.error || data.reason || `Apps Script rejected ${entry.file}`);
+            }
+            return data;
+          } catch (err) {
+            lastErr = err;
+            if (err?.name === "AbortError" || attempt === 2) throw err;
+            await new Promise(r => setTimeout(r, 600));
+          }
         }
-        return await res.json();
+        throw lastErr;
       }
 
       function renderActiveRowGrid() {
