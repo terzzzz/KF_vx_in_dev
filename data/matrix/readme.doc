@@ -736,5 +736,108 @@ In the active Row `009` matrix, Candidate holds **`796`** accepted games (`24,81
 
 
 Part 3:
+Across **1,834 evaluated matches (`v5-state256-action17`, patch `charge1-reset1`)**, all eight early Showa riders (**`001` Ichigo through `008` Skyrider**) post decisive winning records against **Kamen Rider Super-1 (`009`)**, spanning **`85.8%` to `96.7%` win rates** (`89.9%` roster average). **Kamen Rider Amazon (`006_009`)** leads the column at **`96.7%` (`232W–8L–0D`)**, while **Kamen Rider Skyrider (`008_009`)** ranks second at **`92.9%` (`143W–10L–1D`, `93.5%` unbeaten)** and sets the column's fastest knockout pace at **`15.9` average rounds**.
 
+---
+
+### 1. Full 8-Rider Leaderboard vs. Super-1 (`001_009` – `008_009`)
+
+| Rank | Matchup | Rider | Win Rate | Avg Rounds | Mean Selected Q | Logged Demo Rounds (16 Wins) | Core Winning Archetype |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **1** | `006_009` | **Kamen Rider Amazon** | **96.7%** (`232W–8L–0D`) | 16.0 | 2.0906 | 223 R | `100%` `W+I` opener + `4`-Chi `S+I` rush (`13.9%`) |
+| **2** | `008_009` | **Kamen Rider Skyrider** | **92.9%** (`143W–10L–1D`) | **15.9** | 1.8146 | 238 R | `100%` `W+I` opener + `D+I` (`23.5%`) / `S+I` burst |
+| **3** | `001_009` | **Kamen Rider Ichigo** | **91.1%** | 17.6 | 1.8563 | 279 R | High-utility (`34.8% W`) `W+I`/`W+K` + `S+I`/`S+L` |
+| **4** | `002_009` | **Kamen Rider Nigo** | **89.2%** | 20.0 | 1.7971 | 257 R | `D+I` (`22.6%`) + `W+I` (`14.4%`) balanced tempo |
+| **5** | `005_009` | **Kamen Rider X** | **88.8%** | 19.6 | **2.3783** | 304 R | `W+I` (`16.4%`) + `W+J` (`15.8%`) accuracy lock |
+| **6** | `003_009` | **Kamen Rider V3** | **87.9%** | 18.4 | 1.9346 | 232 R | Heavy `W+K` slow (`16.4%`) + `S+I`/`S+L` specials |
+| **7** | `004_009` | **Riderman** | **86.7%** | 18.9 | 1.0561 | 263 R | Heavy basics (`50.6% D`) + guard-counter (`11.0% A`) |
+| **8** | `007_009` | **Kamen Rider Stronger** | **85.8%** (`206W–30L–4D`) | 21.0 | 1.9229 | 313 R | `100%` `W+K` Turn-1 slow + `S+I`/`S+J` two-step KO |
+
+#### Difficulty & Slot Breakdown: Breaking Super-1's Beetle Wall
+
+Across `001–005` and `007` Stronger (`73.3%` win / `76.7%` unbeaten), **Beetle (Defensive)** was the primary bottleneck (`70.0%–76.7%` win rate) due to Super-1's `S+J` (*Elek Beam*, `-2` Chi drain) and `A+I` (*Five Hands*, `-3` Chi parry) attrition. **Amazon (`96.7%`)** and **Skyrider (`90.0%` win / `93.3%` unbeaten)** are the only two riders to clear `90%` against Beetle:
+
+| Rider | Tree-hopper (Easy) | Cricket (Balanced) | Beetle (Defensive) | Bullet Ant (Master) | Slot P1 | Slot P2 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **`006` Amazon** (`240`) | `57W–3L–0D` (**95.0%**) | `60W–0L–0D` (**100.0%**) | `58W–2L–0D` (**96.7%**) | `57W–3L–0D` (**95.0%**) | `117W–3L–0D` (**97.5%**) | `115W–5L–0D` (**95.8%**) |
+| **`008` Skyrider** (`154`) | `58W–2L–0D` (**96.7%**) | `34W–0L–0D` (**100.0%**) | `27W–2L–1D` (**90.0%**) | `24W–6L–0D` (**80.0%**) | `70W–6L–1D` (**90.9%**) | `73W–4L–0D` (**94.8%**) |
+| **`007` Stronger** (`240`) | `57W–3L–0D` (**95.0%**) | `54W–4L–2D` (**90.0%**) | `44W–14L–2D` (**73.3%**) | `51W–9L–0D` (**85.0%**) | `105W–13L–2D` (**87.5%**) | `101W–17L–2D` (**84.2%**) |
+
+---
+
+### 2. Unified ASDW & 16-Command Distribution (`001_009` – `008_009`)
+
+Across **128 logged winning matches (`2,109` total rounds)** against Super-1, every rider anchors its offense on **Basics (`33.3%–50.6% D`)** to farm Chi through Super-1's drains, paired with **Utilities (`14.8%–35.9% W`)** and **Specials (`20.4%–28.0% S`)**:
+
+| Category | `001` (`279` R) | `002` (`257` R) | `003` (`232` R) | `004` (`263` R) | `005` (`304` R) | `006` (`223` R) | `007` (`313` R) | `008` Skyrider (`238` R) | `008` TH (`45` R) | `008` CR (`77` R) | `008` BT (`68` R) | `008` BA (`48` R) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **D (Basics)** | 33.3% | 47.1% | 40.1% | 50.6% | 33.9% | 45.3% | 42.5% | **47.1% (112)** | 44.4% (20) | 45.5% (35) | 52.9% (36) | 43.8% (21) |
+| **S (Specials)** | 28.0% | 24.9% | 26.7% | 21.3% | 20.4% | 27.4% | 22.0% | **22.3% (53)** | 28.9% (13) | 16.9% (13) | 19.1% (13) | 29.2% (14) |
+| **W (Utilities)** | 34.8% | 24.1% | 26.7% | 14.8% | 35.9% | 18.4% | 29.4% | **21.4% (51)** | 24.4% (11) | 23.4% (18) | 20.6% (14) | 16.7% (8) |
+| **A (Defense)** | 1.8% | 2.7% | 3.4% | 11.0% | 6.3% | 7.2% | 4.2% | **7.1% (17)** | 2.2% (1) | 11.7% (9) | 5.9% (4) | 6.3% (3) |
+| **Stunned** | 2.2% | 1.2% | 3.0% | 2.3% | 3.6% | 1.8% | 1.9% | **2.1% (5)** | 0.0% (0) | 2.6% (2) | 1.5% (1) | 4.2% (2) |
+
+#### Complete 16-Move Roster Matrix (`2,109` Logged Winning Rounds)
+
+| Cmd | Tactical Function vs. Super-1 | `001` | `002` | `003` | `004` | `005` | `006` | `007` | `008` Skyrider (Casts) | `008` Split (TH / CR / BT / BA) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **`D+I`** | Primary Chi-Building Basic (`+3` net Chi on hit) | 15.8% | 22.6% | 18.5% | 12.5% | 22.4% | 24.7% | 19.2% | **23.5% (56)** | 12 / 17 / 20 / 7 |
+| **`W+I`** | Speed / Evasion Buff (`2` Chi; counters `S+J` spam) | 19.4% | 14.4% | 10.3% | 11.4% | 16.4% | 13.5% | 16.6% | **19.7% (47)** | 10 / 17 / 12 / 8 |
+| **`D+J`** | Zero-Cost Basic Jab (`+3` net Chi on hit) | 5.4% | 8.9% | 8.6% | 9.1% | 1.6% | 11.2% | 4.5% | **12.2% (29)** | 3 / 9 / 10 / 7 |
+| **`S+I`** | Primary Heavy Finisher (`4–8` Chi) | 10.8% | 9.7% | 9.5% | 16.7% | 9.9% | 13.9% | 8.3% | **10.9% (26)** | 5 / 6 / 9 / 6 |
+| **`D+K`** | Zero-Cost Basic Kick (`+3` net Chi on hit) | 9.0% | 7.8% | 8.6% | 11.0% | 3.0% | 3.1% | 11.8% | **9.7% (23)** | 4 / 7 / 5 / 7 |
+| **`A+J`** | Guard / Chi Battery (`+3–4` net Chi under pressure) | 0.7% | 0.4% | 1.7% | 6.8% | 1.6% | 4.9% | 1.3% | **5.5% (13)** | 0 / 7 / 4 / 2 |
+| **`S+K`** | Mid-Cost Special Finisher (`4` Chi) | 4.7% | 2.7% | 3.4% | 1.5% | 5.6% | 4.5% | 1.3% | **5.0% (12)** | 5 / 2 / 1 / 4 |
+| **`S+L`** | Secondary Heavy Special (`5–7` Chi) | 10.4% | 7.4% | 9.1% | 1.5% | 1.0% | 7.6% | 4.2% | **4.2% (10)** | 2 / 5 / 1 / 2 |
+| **`S+J`** | Low-Chi Closer (`3–4` Chi) | 2.2% | 5.1% | 4.7% | 1.5% | 3.9% | 1.3% | 8.3% | **2.1% (5)** | 1 / 0 / 2 / 2 |
+| **`D+L`** | Heavy Basic (`2` Chi, `+2` refund) | 3.2% | 7.8% | 4.3% | 17.9% | 6.9% | 6.3% | 7.0% | **1.7% (4)** | 1 / 2 / 1 / 0 |
+| **`W+K`** | Slow Debuff (`2` Chi; `100%` R1 on `007`) | 11.8% | 6.2% | 16.4% | 1.5% | 0.0% | 0.0% | 9.6% | **1.7% (4)** | 1 / 1 / 2 / 0 |
+| **`A+I`** | Special Parry (`+4` Chi on successful parry) | 0.0% | 1.6% | 0.9% | 2.3% | 3.3% | 1.3% | 1.6% | **1.3% (3)** | 0 / 2 / 0 / 1 |
+| **`A+K`** | Guard K (`+3–6` net Chi) | 0.4% | 0.8% | 0.4% | 0.8% | 1.3% | 0.0% | 1.0% | **0.4% (1)** | 1 / 0 / 0 / 0 |
+| **`W+J`** | Accuracy Buff (`2` Chi; signature of `005` X) | 0.0% | 2.7% | 0.0% | 1.9% | 15.8% | 0.4% | 1.0% | **0.0% (0)** | 0 / 0 / 0 / 0 |
+| **`W+L`** | Faint Recovery (`0` Chi, `-50` to `-75` Fnt) | 3.6% | 0.8% | 0.0% | 0.0% | 3.6% | 4.5% | 2.2% | **0.0% (0)** | 0 / 0 / 0 / 0 |
+| **`A+L`** | Guard L (`0` Chi, `+3–4` net Chi) | 0.7% | 0.0% | 0.4% | 1.1% | 0.0% | 0.9% | 0.3% | **0.0% (0)** | 0 / 0 / 0 / 0 |
+
+---
+
+### 3. Skyrider (`008_009`) Spotlight: Fastest Pace in Column `009` (`15.9` Avg Rounds)
+
+Skyrider (`2,900` starting LP) completes the column evaluation at **`92.9%` (`143W–10L–1D`, `93.5%` unbeaten)**, including **`100.0%` (`34W–0L`) against Cricket** and **`100.0%` (`15W–0L`) as P2 against Beetle**:
+
+1. **`100%` `W+I` Turn-1 Opener (`16 / 16` Wins) + `D+I` (`23.5%`) / `D+J` (`12.2%`) Rapid Burst:**
+* Skyrider opens every logged win with **`W+I`** (`8 → 6` Chi after `+1` regen), dodging Super-1's Turn-1 `S+J` / `S+K` / `S+L` probes while chaining **`D+I` (`23.5%`)** and **`D+J` (`12.2%`)** to reach `10–13` Chi by Turn 4–5.
+* Its **`S+I` (`26` casts, `10.9%`)** deals **`1,431–2,440` damage** (`2480 → 40 = 2,440` in *Beetle Win #1 R13*, `2379 → 0 = 2,379` in *Beetle Win #4 R24*, `2707 → 780 = 1,927` in *Tree-hopper Win #2 R4*), enabling **5-to-7-round knockouts** (*Tree-hopper Win #3* in 5 rounds, *Bullet Ant Win #2* in 5 rounds, *Tree-hopper Win #2* and *Cricket Win #3* in 7 rounds).
+
+
+2. **Beetle Basic Surge (`52.9%` `D`) + `A+J` (`5.5%`) Neutralizes Chi-Drain Attrition:**
+* Against **Beetle** (`27W–2L–1D`, `90.0%` win / `93.3%` unbeaten), Skyrider raises its `D`-basic volume from `43.8%–45.5%` in other tiers to **`52.9%` (`36 / 68` rounds)**—led by `D+I` (`20` casts) and `D+J` (`10` casts)—and mixes in **`A+J` (`4` Beetle casts, `7` Cricket casts)** whenever Super-1 chains `S+J` (`-2` Chi). That steady `+3` net Chi income lets Skyrider absorb `A+I` parries and still fire two `S+I` finishers per game (*Beetle Wins #1–4*).
+
+
+3. **Zero `W+L` / `W+J` Overhead + Three-Way Special Closing (`S+K`, `S+L`, `S+J`):**
+* Skyrider never spends turns on `W+L` or `W+J` (`0` casts), instead converting any `1–4` Chi left over after an `S+I` directly into lethal **`S+K` (`12` casts, `5.0%`)**, **`S+L` (`10` casts, `4.2%`)**, or **`S+J` (`5` casts, `2.1%`)** closers (*Tree-hopper Wins #2–4*, *Cricket Wins #1–4*, *Bullet Ant Wins #1–4*).
+
+
+
+---
+
+### 4. Consolidated Counter-Play Blueprint Against Kamen Rider Super-1 (`009`)
+
+> Super-1 enters every match with **`2,888` LP** and relies on three core habits: stacking **`W+I` evasion**, draining meter with **`S+J` (*Elek Beam*, `-2` Chi)**, and parrying predictable basics with **`A+I` (*Five Hands*, `-3` Chi)**.
+
+Across all eight riders, four proven mechanisms dismantle Super-1 consistently:
+
+1. **Open `W+I` (or `W+K` on High-LP Tanks) to Win Turn-1 Initiative:**
+* Seven of the eight riders (`001–006` and `008`) prioritize **`W+I` (`10.3%–19.7%` overall usage)** on Turn 1—with **Amazon (`16 / 16`)** and **Skyrider (`16 / 16`)** opening `W+I` 100% of the time—denying Super-1's early `S+J` / `S+K` / `S+L` hits. **Stronger (`007`)** is the sole exception, opening **`W+K` (`16 / 16`)** behind its `3,200` LP pool before layering `W+I` on Turn 2–3.
+
+
+2. **Farm Meter Through `D+I` (`12.5%–24.7%`) and `0`-Chi Jabs/Kicks (`D+J` / `D+K`):**
+* Because Super-1's `S+J` strips `2` Chi and `A+I` strips `3` Chi, passive waiting loses the meter war. Every top performer farms Chi via **`D+I`** (`24.7%` Amazon, `23.5%` Skyrider, `22.6%` Nigo, `22.4%` X) supplemented by `0`-Chi **`D+J`** (`12.2%` Skyrider, `11.2%` Amazon) or **`D+K`** (`11.8%` Stronger, `11.0%` Riderman), netting `+3` Chi per landed hit.
+
+
+3. **Counter Super-1's `W+I` Evasion Stacking with `W+J` Accuracy or Multi-Hit Pressure:**
+* When Super-1 chains `W+I` buffs in Cricket and Bullet Ant, **Kamen Rider X (`005`)** pairs `W+I` (`16.4%`) with **`W+J` (`15.8%`)** to lock accuracy and hold the column's top mean Q (`2.3783`), while **Ichigo (`001`)** and **V3 (`003`)** counter-debuff with **`W+K` (`11.8%` and `16.4%`)**.
+
+
+4. **Pivot to `A+J` / `A+I` Guard-Counters Under Heavy `S+J` Pressure:**
+* When Super-1 opens with back-to-back `S+J` drains and raises faint above `65%`, **Riderman (`11.0% A`)**, **Amazon (`7.2% A`, `17.2%` in Beetle)**, and **Skyrider (`7.1% A`, `11.7%` in Cricket)** insert **`A+J` (`+3–4` net Chi)** and **`A+I` (`+4` Chi on parry)** to safely bridge to their `S+I` knockout threshold without giving Super-1 free stun turns.
 
