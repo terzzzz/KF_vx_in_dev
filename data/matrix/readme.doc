@@ -22,7 +22,7 @@ Part 3: a report of how 001 to 008 evaluate vs 009.
 
 
 
-
+Part 1:
 
 # Showa Kamen Rider Candidate Evaluation Suite (`v5-state256-action17` | `charge1-reset1`)
 
@@ -662,3 +662,79 @@ Across the logged winning sequences (`008_001` through `008_007`), Skyrider foll
 * **Strongest Matchups:** Skyrider posts **90.5%** vs. **Stronger (`008_007`)** (including `100%` P2 sweeps on Tree-hopper and `93.3%` on Cricket) and **87.3%** vs. **X (`008_005`)** (including `93.3%` on Bullet Ant).
 * **Primary Friction Points:** **Amazon (`008_006`)** is Skyrider's lowest overall matchup (**70.6%**, and **50.0% / `15W–15L**` on Beetle, with `6W–9L` on Beetle P2), while **Skyrider Mirror (`008_008`)** drops to **60.0% (`18W–12L`)** on Bullet Ant.
 * **Promotion Recommendation:** With an **81.3% overall win rate**, **75.8% Master-tier win rate**, and verified cross-roster baseline coverage, the `v5-state256-action17` (`charge1-reset1`) **Skyrider (`008_008`)** checkpoint is cleared for promotion into the broader roster matrix.
+
+
+Part 2:
+Row **`009` (Kamen Rider Super-1)** under build **`v5-state256-action17`** (patch **`charge1-reset1`**) shows a policy that dynamically shifts between two distinct combat archetypes—a **`S+J` Chi-starvation spammer** against evasion/special-reliant fighters and a **zero-cost `D+J`/`D+K` into `S+I` stun-punisher** against high-LP tanks and the mirror match.
+
+---
+
+### 1. Complete 9-Opponent ASDW & 16-Move Distribution Matrix (`009_001` – `009_009`)
+
+Across the 16 logged demo wins per matchup, Super-1's action economy pivots dramatically depending on opponent LP pools, healing loops, and evasion profiles:
+
+#### Category Breakdown Across All 9 Opponents
+
+| Category | `001` Ichigo | `002` Nigo | `003` V3 | `004` Riderman | `005` X | `006` Amazon | `007` Stronger | `008` Skyrider | `009` Super-1 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **S (Specials)** | 28.7% | 29.2% | 47.5% | **53.1%** | 42.1% | 41.9% | 24.0% | 46.5% | **22.6%** |
+| **D (Basics)** | 42.6% | 44.2% | 30.9% | 33.5% | 40.8% | 38.4% | 50.1% | 32.4% | **53.0%** |
+| **W (Utilities)** | **20.1%** | 17.9% | 11.6% | 10.2% | 12.5% | 11.9% | 19.7% | 11.6% | 18.1% |
+| **A (Defense)** | 8.3% | 8.5% | **8.9%** | 2.5% | 4.0% | 7.8% | 5.3% | 7.5% | 5.6% |
+| **Stunned** | 0.3% | 0.3% | 1.2% | 0.7% | 0.5% | **0.0%** | 0.8% | **1.9%** | 0.7% |
+
+#### Full 16-Move Usage Matrix (`009_001` – `009_009`)
+
+| Cmd | Super-1 Move Name (Specs) | `001` Ichigo | `002` Nigo | `003` V3 | `004` Riderman | `005` X | `006` Amazon | `007` Stronger | `008` Skyrider | `009` Super-1 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **`S+J`** | Elek Beam (`3` Chi, `REACH`, `-2` drain) | 14.2% | 15.0% | 27.0% | **29.8%** | 27.5% | 22.8% | 9.3% | 29.6% | **8.5%** |
+| **`D+J`** | Super Hand Jab (`0` Chi, `+2` refund) | 9.3% | 15.7% | 16.6% | 19.3% | 11.2% | 20.6% | **23.2%** | 13.8% | 16.6% |
+| **`D+K`** | Shorinji Kick (`0` Chi, `+2` refund) | 21.0% | 16.3% | 9.7% | 6.5% | 18.9% | 13.1% | 15.5% | 8.5% | **21.7%** |
+| **`W+I`** | Super Jump (`0` Chi, `1.2x` Spd / `+25%` Eva) | 14.5% | 11.9% | 7.3% | 8.4% | 10.1% | 9.4% | 13.1% | 7.5% | **15.2%** |
+| **`S+I`** | Super Rider Lightning Sword (`9` Chi, `+4` refund) | 11.7% | 11.9% | **12.7%** | 8.4% | 8.0% | 9.1% | 11.2% | **6.9%** | 10.5% |
+| **`D+I`** | Elek Hand Shock (`2` Chi, `+2` refund, `-1` drain) | **9.9%** | 8.2% | 3.9% | 5.1% | 5.9% | 3.1% | 7.5% | 7.2% | 7.6% |
+| **`A+I`** | Five Hands Parry (`4` Chi, omni) | **6.8%** | 3.8% | 5.0% | 1.5% | 3.5% | 4.4% | 3.7% | 3.5% | 2.0% |
+| **`S+L`** | Super Rider Moon Surface Kick (`7` Chi, `+3` refund) | 1.5% | 0.9% | 6.2% | **8.4%** | 4.5% | 6.6% | 1.3% | 3.5% | 2.9% |
+| **`D+L`** | Power Hand Crush (`2` Chi, `1.30x` Break) | 2.5% | 4.1% | 0.8% | 2.5% | 4.8% | 1.6% | 4.0% | 2.8% | **7.2%** |
+| **`S+K`** | Power Hand Smash (`5` Chi, `+1` refund, `1.20x` Break) | 1.2% | 1.3% | 1.5% | 6.5% | 2.1% | 3.4% | 2.1% | **6.6%** | **0.7%** |
+| **`W+K`** | Cold Hand Cryo Spray (`2` Chi, `0.7x` Slow) | 2.8% | **4.4%** | 0.8% | 0.4% | 0.0% | 0.3% | 2.9% | 1.6% | 0.0% |
+| **`W+J`** | Radar Hand Lock-On (`1` Chi, `+35` Acc) | 1.2% | 0.9% | 2.7% | 0.4% | 0.5% | 1.3% | **2.9%** | 1.3% | 1.8% |
+| **`A+L`** | Standard Guard L (`0` Chi) | 1.5% | **3.8%** | 2.7% | 0.7% | 0.5% | 0.9% | 0.8% | 1.6% | 1.3% |
+| **`W+L`** | Sekishin Meditation (`0` Chi, `-42` Fnt) | 1.5% | 0.6% | 0.8% | 1.1% | **1.9%** | 0.9% | 0.8% | 1.3% | 1.1% |
+| **`A+K`** | Standard Guard K (`0` Chi) | 0.0% | 0.6% | 1.2% | 0.4% | 0.0% | **2.5%** | 0.0% | 1.6% | 1.6% |
+| **`A+J`** | Standard Guard J (`0` Chi) | 0.0% | 0.3% | 0.0% | 0.0% | 0.0% | 0.0% | 0.8% | **0.9%** | 0.7% |
+
+---
+
+### 2. Logged Matchup Performance, Difficulty Splits & Q-Values (`009_006` – `009_009`)
+
+In the active Row `009` matrix, Candidate holds **`796`** accepted games (`24,811` decisions) across cells `004`–`009`, **`2,150`** games vs. `1,518` Active in `003` (V3), **`798`** in `002` (Nigo), and **`1,126`** in `001` (Ichigo). Across the **`478`** completed evaluation matches logged in `009_006` through `009_009`, Super-1 achieved **`383W–83L–12D` (`80.1%` win rate / `82.6%` unbeaten)**:
+
+| Cell & Opponent | Record (W-L-D) | Win Rate | Avg Rounds | Mean Q | P1 Record (Win %) | P2 Record (Win %) | TH (Easy) | CR (Bal) | BT (Def) | BA (Mst) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **`009_006` Amazon** | `91W–26L–3D` | **75.8%** | — | — | `48W–10L–2D` (80.0%) | `43W–16L–1D` (71.7%) | 73.3% (22-8) | **93.3%** (28-0-2) | 56.7% (17-13) | 80.0% (24-5-1) |
+| **`009_007` Stronger** | `100W–15L–3D` | **84.7%** | 24.6 | `1.2005` | `49W–8L–2D` (83.1%) | `51W–7L–1D` (86.4%) | 90.0% (27-3) | 73.3% (22-5-3) | 86.7% (26-4) | **89.3%** (25-3) |
+| **`009_008` Skyrider** | `89W–31L–0D` | **74.2%** | 19.9 | `0.8766` | `43W–17L–0D` (71.7%) | `46W–14L–0D` (76.7%) | 90.0% (27-3) | 76.7% (23-7) | 53.3% (16-14) | 76.7% (23-7) |
+| **`009_009` Super-1** | `103W–11L–6D` | **85.8%** | 25.3 | `1.3828` | `49W–7L–4D` (81.7%) | `54W–4L–2D` (90.0%) | **96.7%** (29-1) | 90.0% (27-2-1) | 73.3% (22-5-3) | 83.3% (25-3-2) |
+
+---
+
+### 3. Key Strategic Takeaways Across Row `009`
+
+1. **Two Distinct Policy Regimes (Chi-Burn vs. Stun-Punish):**
+* **Against Chi-Dependent & Evasive Riders (`V3`, `Riderman`, `X`, `Skyrider`):** Super-1 elevates Specials to **`42.1%–53.1%`**, spamming **`S+J` (*Elek Beam*, `27.0%–29.8%`)** to bypass evasion via `REACH` and strip `-2` Chi per turn, locking opponents out of their `7–9` Chi finishers.
+* **Against High-LP Tanks & Mirror (`Stronger`, `Super-1`):** Super-1 drops `S+J` to **`8.5%–9.3%`** and surges Basics to **`50.1%–53.0%`**, banking `15–16` Chi via zero-cost **`D+J` (`16.6%–23.2%`)** and **`D+K` (`15.5%–21.7%`)** while pushing opponent `Fnt` to `100` for guaranteed **`S+I`** (`1,300–1,930` damage) stun executions.
+
+
+2. **`D+L` (`1.30x` Break) vs. `S+K` (`1.20x` Break) Optimization:**
+* Because `ARMOR BREAK` occupies a single debuff slot rather than stacking, the Candidate policy learns to separate them by Chi budget: it favors **`D+L` (`2` Chi, `7.2%` in the mirror)** when banking `12–16` Chi for an immediate `S+I` (`9` Chi) follow-up, and pivots to **`S+K` (`5` Chi, `6.6%` vs. Skyrider)** as a standalone mid-Chi closer when `S+J` spam keeps its own Chi pool low.
+
+
+3. **Beetle (Defensive) Remains the Sole Soft Spot:**
+* While Super-1 dominates **Tree-hopper (`73.3%–96.7%`)**, **Cricket (`73.3%–93.3%`)**, and **Bullet Ant (`76.7%–89.3%`)**, defensive **Beetle** profiles that pair `W+I` evasion with `W+L` sustain (`Amazon` at `56.7%`, `Skyrider` at `53.3%`) account for nearly half of Super-1's total losses.
+
+
+
+Part 3:
+
+
